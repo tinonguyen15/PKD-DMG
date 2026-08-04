@@ -7,7 +7,7 @@
 <?php endif; ?>
 
 <section class="content-grid one">
-  <!-- <form class="panel stack" method="post" action="<?= e(url('/contacts')) ?>">
+  <form class="panel stack" method="post" action="<?= e(url('/contacts')) ?>">
     <?= csrf_field() ?>
     <div class="section-head">
       <h2>Tiếp cận</h2>
@@ -57,7 +57,7 @@
       </label>
     </div>
     <button class="btn primary" type="submit">Lưu tiếp cận</button>
-  </form> -->
+  </form>
 
   <form class="panel filter-grid" method="get" action="<?= e(url('/contacts')) ?>">
     <div class="section-head wide">
@@ -122,6 +122,7 @@
             <td><?= e($channels[$row['channel']] ?? $row['channel']) ?></td>
             <td><?= (int) $row['received_count'] ?></td>
             <td><?= (int) $row['order_count'] ?></td>
+            <td></td>
             <td><?= e($row['note']) ?></td>
           </tr>
         <?php endforeach; ?>
