@@ -3,27 +3,40 @@ $loginError = flash('error');
 $oldUsername = flash('old_username') ?: '';
 
 $assetImageUrl = static function (array $preferredNames, array $fallbackPatterns = []): ?string {
-    $imageDir = dirname(__DIR__, 3) . '/public/assets/images';
+    $imageRoot = dirname(__DIR__, 3) . '/public/assets/images';
     $allowedExtensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'];
+    $searchDirectories = [
+        ['dir' => $imageRoot, 'url' => '/assets/images'],
+        ['dir' => $imageRoot . '/lib', 'url' => '/assets/images/lib'],
+    ];
 
-    $toUrl = static function (string $filename): string {
-        return url('/assets/images/' . rawurlencode($filename));
+    $toUrl = static function (string $baseUrl, string $filename): string {
+        return url(rtrim($baseUrl, '/') . '/' . rawurlencode($filename));
     };
 
     foreach ($preferredNames as $name) {
         $name = basename((string) $name);
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-        if ($name !== '' && in_array($extension, $allowedExtensions, true) && is_file($imageDir . '/' . $name)) {
-            return $toUrl($name);
+        if ($name === '' || !in_array($extension, $allowedExtensions, true)) {
+            continue;
+        }
+
+        foreach ($searchDirectories as $directory) {
+            $path = $directory['dir'] . '/' . $name;
+            if (is_file($path)) {
+                return $toUrl($directory['url'], $name);
+            }
         }
     }
 
     foreach ($fallbackPatterns as $pattern) {
-        foreach (glob($imageDir . '/' . $pattern) ?: [] as $path) {
-            $name = basename($path);
-            $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-            if (in_array($extension, $allowedExtensions, true) && is_file($path)) {
-                return $toUrl($name);
+        foreach ($searchDirectories as $directory) {
+            foreach (glob($directory['dir'] . '/' . $pattern) ?: [] as $path) {
+                $name = basename($path);
+                $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                if (in_array($extension, $allowedExtensions, true) && is_file($path)) {
+                    return $toUrl($directory['url'], $name);
+                }
             }
         }
     }
@@ -33,12 +46,12 @@ $assetImageUrl = static function (array $preferredNames, array $fallbackPatterns
 
 $logoUrl = $assetImageUrl(
     ['logo.png', 'logo.webp', 'logo.jpg', 'logo.jpeg', 'dmg-logo.png', 'pkd-logo.png', 'brand-logo.png', 'dmh-logo.png'],
-    ['*logo*.png', '*logo*.webp', '*logo*.jpg', '*logo*.jpeg', '*Logo*.png', '*Logo*.webp', '*dmg*.png', '*DMG*.png']
+    ['*logo*.png', '*logo*.webp', '*logo*.jpg', '*logo*.jpeg', '*Logo*.png', '*Logo*.webp', '*LOGO*.png', '*dmg*.png', '*DMG*.png']
 );
 
 $loginBannerUrl = $assetImageUrl(
     ['login-banner.png', 'login-banner.webp', 'login-banner.jpg', 'login-banner.jpeg', 'banner-login.png', 'banner.png', 'cover.png', 'hero.png'],
-    ['*login*banner*.png', '*login*banner*.webp', '*login*banner*.jpg', '*banner*.png', '*banner*.webp', '*banner*.jpg', '*cover*.png', '*hero*.png']
+    ['*login*banner*.png', '*login*banner*.webp', '*login*banner*.jpg', '*banner*.png', '*banner*.webp', '*banner*.jpg', '*banner*.jpeg', '*Banner*.png', '*Banner*.webp', '*cover*.png', '*cover*.webp', '*hero*.png', '*hero*.webp']
 );
 ?>
 
