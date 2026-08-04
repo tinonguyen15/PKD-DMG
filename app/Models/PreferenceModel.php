@@ -136,6 +136,19 @@ class PreferenceModel
         return self::sanitizeAll($resolved);
     }
 
+    public static function value(string $key, mixed $default = null, ?int $userId = null): mixed
+    {
+        if (!array_key_exists($key, self::DEFAULTS)) {
+            return $default;
+        }
+
+        $currentUser = function_exists('current_user') ? \current_user() : null;
+        $resolvedUserId = $userId ?? (is_array($currentUser) ? (int) ($currentUser['id'] ?? 0) : 0);
+        $values = $resolvedUserId > 0 ? self::resolved($resolvedUserId) : self::systemValues();
+
+        return array_key_exists($key, $values) ? $values[$key] : ($default ?? self::DEFAULTS[$key]);
+    }
+
     public static function saveSystem(array $input): void
     {
         $values = self::sanitizeAll(self::postedValues($input));
