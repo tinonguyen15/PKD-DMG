@@ -1,8 +1,30 @@
 /* Optional brand/logo assets.
-   Put files here:
-   - public/assets/images/logo.png
-   - public/assets/images/login-banner.png
+   App tự dò file ảnh trong public/assets/images.
+   Nên đặt tên dễ nhận:
+   - logo.png / logo.webp / dmg-logo.png
+   - login-banner.png / banner.png / cover.png
 */
+
+.brand {
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px;
+  min-width: 0;
+}
+
+.brand-mark,
+.brand span.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.brand-mark.has-image,
+.brand:has(.brand-mark.has-image) .brand-mark {
+  background: rgba(255, 255, 255, .10);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, .10);
+}
 
 .brand-mark img,
 .login-brand-mark img,
@@ -16,7 +38,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 6px;
+  padding: 3px;
 }
 
 .brand-mark b {
@@ -30,7 +52,44 @@
   letter-spacing: .04em;
 }
 
-.brand:has(.brand-mark img:not([hidden])) .brand-mark {
-  background: rgba(255, 255, 255, .08);
-  box-shadow: 0 14px 26px rgba(0, 0, 0, .10);
+.brand-copy {
+  min-width: 0;
+  align-self: center;
+  display: grid;
+  gap: 2px;
+}
+
+.brand-copy strong {
+  display: block;
+  max-width: 100%;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1.12;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-copy small {
+  display: block;
+  max-width: 100%;
+  color: rgba(244, 248, 241, .72);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-quick {
+  margin-top: 0;
+}
+
+@media (max-width: 1360px) {
+  .brand {
+    width: fit-content;
+    max-width: 260px;
+  }
 }
