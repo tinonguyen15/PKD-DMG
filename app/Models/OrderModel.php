@@ -103,12 +103,14 @@ class OrderModel
             $orderCode = self::nextCode();
             $total = array_sum(array_column($items, 'line_total'));
             $generatedText = self::generateBranchText($data, $items);
+            $now = date('Y-m-d H:i:s');
 
             Database::execute(
                 "INSERT INTO orders
                  (order_code, user_id, branch_id, source_id, payment_method_id, order_type, workflow_status, status_label,
-                  customer_name, phone, address, receive_time, guest_count, subtotal, total, note, quick_notice_keys, generated_text)
-                 VALUES (?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  customer_name, phone, address, receive_time, guest_count, subtotal, total, note, quick_notice_keys, generated_text,
+                  created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     $orderCode,
                     (int) $data['user_id'],
@@ -127,6 +129,8 @@ class OrderModel
                     trim((string) ($data['note'] ?? '')),
                     json_encode(self::sanitizeQuickNoticeKeys($data['quick_notice_keys'] ?? []), JSON_UNESCAPED_UNICODE),
                     $generatedText,
+                    $now,
+                    $now,
                 ]
             );
 
@@ -173,8 +177,8 @@ class OrderModel
         $cancelledAt = $workflowStatus === 'cancelled' ? date('Y-m-d H:i:s') : null;
 
         Database::execute(
-            'UPDATE orders SET workflow_status = ?, completed_at = ?, cancelled_at = ? WHERE id = ?',
-            [$workflowStatus, $completedAt, $cancelledAt, $id]
+            'UPDATE orders SET workflow_status = ?, completed_at = ?, cancelled_at = ?, updated_at = ? WHERE id = ?',
+            [$workflowStatus, $completedAt, $cancelledAt, date('Y-m-d H:i:s'), $id]
         );
 
         self::audit('orders.status', 'orders', $id, ['from' => $order['workflow_status'], 'to' => $workflowStatus]);
@@ -182,161 +186,226 @@ class OrderModel
         return true;
     }
 
+    public static function recentMenuItemIds(int $userId, int $limit = 6): array
+    {
+        $rows = Database::fetchAll(
+            "SELECT oi.menu_item_id, MAX(o.created_at) AS last_ordered_at, COUNT(*) AS total
+             FROM order_items oi
+             JOIN orders o ON o.id = oi.order_id
+             WHERE o.user_id = ? AND oi.menu_item_id IS NOT NULL
+             GROUP BY oi.menu_item_id
+             ORDER BY last_ordered_at DESC, total DESC
+             LIMIT {$limit}",
+            [$userId]
+        );
+
+        return array_values(array_map('intval', array_column($rows, 'menu_item_id')));
+    }
+
     public static function prepareItems(array $quantities, array $notes = []): array
     {
-        $menuItems = [];
-        foreach (CatalogModel::menuItems(true) as $item) {
-            $menuItems[(int) $item['id']] = $item;
-        }
-
         $items = [];
-        foreach ($quantities as $id => $quantity) {
-            $id = (int) $id;
+        foreach ($quantities as $itemId => $quantity) {
             $quantity = max(0, (int) $quantity);
-            if ($quantity < 1 || empty($menuItems[$id])) {
+            if ($quantity <= 0) {
                 continue;
             }
 
-            $menuItem = $menuItems[$id];
-            $price = (int) $menuItem['price'];
+            $menuItem = CatalogModel::menuItem((int) $itemId);
+            if (!$menuItem || empty($menuItem['active'])) {
+                continue;
+            }
+
+            $note = trim((string) ($notes[$itemId] ?? ''));
+            $branchName = trim((string) ($menuItem['branch_name'] ?? '')) ?: $menuItem['name'];
+            $customerName = trim((string) ($menuItem['customer_name'] ?? '')) ?: $menuItem['name'];
+
             $items[] = [
-                'menu_item_id' => $id,
+                'menu_item_id' => (int) $menuItem['id'],
                 'item_name' => $menuItem['name'],
-                'branch_name' => $menuItem['branch_name'] ?: $menuItem['name'],
-                'customer_name' => $menuItem['customer_name'] ?: $menuItem['name'],
-                'item_note' => trim((string) ($notes[$id] ?? '')),
-                'price' => $price,
+                'branch_name' => $branchName,
+                'customer_name' => $customerName,
+                'item_note' => $note,
+                'price' => (int) $menuItem['price'],
                 'quantity' => $quantity,
-                'line_total' => $price * $quantity,
+                'line_total' => (int) $menuItem['price'] * $quantity,
             ];
         }
 
         return $items;
     }
 
-    public static function sanitizeQuickNoticeKeys(array|string|null $keys): array
+    public static function generateBranchText(array $order, array $items): string
     {
-        if (is_string($keys)) {
-            $decoded = json_decode($keys, true);
-            $keys = is_array($decoded) ? $decoded : [];
-        }
-
-        $clean = [];
-        foreach ((array) $keys as $key) {
-            $key = (string) $key;
-            if (isset(self::QUICK_NOTICE_LABELS[$key])) {
-                $clean[$key] = $key;
-            }
-        }
-
-        return array_values($clean);
-    }
-
-    public static function recentMenuItemIds(int $userId, int $limit = 8): array
-    {
-        if ($userId <= 0) {
-            return [];
-        }
-
-        $rows = Database::fetchAll(
-            "SELECT oi.menu_item_id, MAX(o.created_at) AS last_ordered_at
-             FROM order_items oi
-             JOIN orders o ON o.id = oi.order_id
-             WHERE o.user_id = ? AND oi.menu_item_id IS NOT NULL
-             GROUP BY oi.menu_item_id
-             ORDER BY last_ordered_at DESC
-             LIMIT {$limit}",
-            [$userId]
-        );
-
-        return array_map('intval', array_column($rows, 'menu_item_id'));
-    }
-
-    public static function generateBranchText(array $data, array $items, ?array $preferences = null): string
-    {
-        $preferences ??= PreferenceModel::resolved((int) ($data['user_id'] ?? (\current_user()['id'] ?? 0)));
-
-        if ($data['order_type'] === 'booking') {
-            return self::generateBookingBranchText($data, $preferences);
-        }
-
-        $title = match ($data['order_type']) {
-            'pickup' => 'ĐƠN GHÉ LẤY',
-            default => 'ĐƠN MANG VỀ',
-        };
-        $timeLabel = match ($data['order_type']) {
-            'pickup' => 'Thời gian ghé lấy',
-            default => 'Thời gian nhận',
-        };
-        $timeFallback = $data['order_type'] === 'delivery' ? 'Giao ngay' : 'Chưa nhập';
-        $lines = [
-            $title,
-            '',
-            '• Chi nhánh: ' . ($data['branch_name'] ?? 'Chưa chọn'),
-            '• Tên: ' . trim((string) $data['customer_name']),
-            '• SĐT: ' . trim((string) $data['phone']),
-        ];
-
-        if ($data['order_type'] === 'delivery') {
-            $lines[] = '• Địa chỉ: ' . (trim((string) ($data['address'] ?? '')) ?: 'Chưa nhập');
-        }
-
-        foreach ($items as $index => $item) {
-            $prefix = $index === 0 ? '• Món: ' : '';
-            $price = $item['price'] > 0 ? ' ' . ((int) round($item['price'] / 1000)) . 'k' : '';
-            $note = trim((string) ($item['item_note'] ?? ''));
-            $lines[] = $prefix . $item['quantity'] . ' ' . $item['branch_name'] . $price . ($note !== '' ? ' - ' . $note : '');
-        }
-
-        $lines[] = '• ' . $timeLabel . ': ' . (trim((string) ($data['receive_time'] ?? '')) ?: $timeFallback);
-        $lines[] = '• Thanh toán: ' . (trim((string) ($data['payment_name'] ?? '')) ?: 'Chưa chọn');
-
-        self::appendBranchFooter($lines, $data, $preferences);
-
-        return implode("\n", $lines);
-    }
-
-    public static function generateCustomerText(array $order, ?array $preferences = null): string
-    {
-        $preferences ??= PreferenceModel::resolved((int) ($order['user_id'] ?? (\current_user()['id'] ?? 0)));
+        $preferences = PreferenceModel::resolved((int) \current_user()['id']);
 
         if (($order['order_type'] ?? '') === 'booking') {
-            return self::generateBookingCustomerText($order, $preferences);
+            return self::generateBookingBranchText($order, $preferences);
         }
 
-        $items = $order['items'] ?? [];
-        $title = ($order['order_type'] ?? '') === 'pickup' ? 'GHÉ LẤY' : 'MANG VỀ';
-        $timeLabel = ($order['order_type'] ?? '') === 'pickup' ? 'Thời gian ghé lấy' : 'Thời gian nhận';
+        $isPickup = ($order['order_type'] ?? '') === 'pickup';
+        $title = $isPickup ? 'ĐƠN GHÉ LẤY' : 'ĐƠN MANG VỀ';
+        $statusLabel = trim((string) ($order['status_label'] ?? '')) ?: 'Done';
+        $paymentName = trim((string) ($order['payment_name'] ?? ''));
+        $paymentLine = '';
+        if ($paymentName !== '' && !$isPickup) {
+            $paymentLine = match ($paymentName) {
+                'Chuyển khoản' => ' - CK',
+                'COD' => ' - COD',
+                default => '',
+            };
+        }
+
         $lines = [
-            'XÁC NHẬN ĐƠN ' . $title,
-            '',
+            $title . ' - ' . $statusLabel . $paymentLine,
+            '• Tên: ' . trim((string) ($order['customer_name'] ?? '')),
+            '• SĐT: ' . trim((string) ($order['phone'] ?? '')),
         ];
-        self::appendCustomerIntro($lines, $preferences);
-        array_push($lines,
-            '• Chi nhánh: ' . ($order['branch_name'] ?? 'Chưa chọn'),
-            '• Tên: ' . ($order['customer_name'] ?? ''),
-            '• SĐT: ' . ($order['phone'] ?? '')
-        );
 
-        if (($order['order_type'] ?? '') === 'delivery') {
-            $lines[] = '• Địa chỉ: ' . ($order['address'] ?: 'Chưa nhập');
+        if (!$isPickup) {
+            $lines[] = '• Địa chỉ: ' . trim((string) ($order['address'] ?? ''));
+        } else {
+            $lines[] = '• Thời gian ghé lấy: ' . (trim((string) ($order['receive_time'] ?? '')) ?: 'Chưa nhập');
         }
 
-        foreach ($items as $index => $item) {
-            $prefix = $index === 0 ? '• Món: ' : '';
-            $note = trim((string) ($item['item_note'] ?? ''));
-            $lines[] = $prefix . $item['quantity'] . ' ' . ($item['customer_name'] ?: $item['item_name']) . ($note !== '' ? ' - ' . $note : '');
+        $lines[] = '• Món: ' . self::formatItemsForCopy($items, false);
+        $lines[] = '• Tổng tiền: ' . money(array_sum(array_column($items, 'line_total')));
+
+        $note = trim((string) ($order['note'] ?? ''));
+        if ($note !== '') {
+            $lines[] = '• Ghi chú: ' . $note;
         }
 
-        $lines[] = '== Tổng tiền món: ' . \money((int) $order['total']) . ' ==';
-        $lines[] = '• ' . $timeLabel . ': ' . ($order['receive_time'] ?: '...');
-        $lines[] = '• Hình thức thanh toán: ' . ($order['payment_name'] ?? '...');
-        self::appendCustomerFooter($lines, $preferences);
+        self::appendQuickNotices($lines, $order, $preferences);
+        self::appendBranchFooter($lines, $order, $preferences);
 
         return implode("\n", $lines);
     }
 
-    public static function orderTypeLabel(string $type): string
+    public static function generateCustomerText(array $order): string
+    {
+        $intro = trim((string) PreferenceModel::value('customer_confirmation_intro', ''));
+        $footer = trim((string) PreferenceModel::value('customer_confirmation_footer', ''));
+
+        $lines = [];
+        if ($intro !== '') {
+            $lines[] = $intro;
+        } else {
+            $lines[] = 'Dạ em xác nhận đơn của mình như sau ạ:';
+        }
+
+        $lines[] = '• Tên: ' . trim((string) ($order['customer_name'] ?? ''));
+        $lines[] = '• SĐT: ' . trim((string) ($order['phone'] ?? ''));
+        if (($order['order_type'] ?? '') === 'delivery') {
+            $lines[] = '• Địa chỉ: ' . trim((string) ($order['address'] ?? ''));
+        }
+        if (($order['order_type'] ?? '') === 'pickup') {
+            $lines[] = '• Thời gian ghé lấy: ' . (trim((string) ($order['receive_time'] ?? '')) ?: 'Chưa nhập');
+        }
+        if (($order['order_type'] ?? '') === 'booking') {
+            $lines[] = '• Chi nhánh: ' . (trim((string) ($order['branch_name'] ?? '')) ?: 'Chưa chọn');
+            $lines[] = '• Số lượng: ' . ((int) ($order['guest_count'] ?? 0) > 0 ? (int) $order['guest_count'] . ' khách' : 'Chưa nhập');
+            $lines[] = '• Thời gian: ' . (trim((string) ($order['receive_time'] ?? '')) ?: 'Chưa nhập');
+        }
+
+        if (!empty($order['items'])) {
+            $lines[] = '• Món: ' . self::formatItemsForCopy($order['items'], true);
+            $lines[] = '• Tổng tiền: ' . money((int) ($order['total'] ?? 0));
+        }
+
+        if ($footer !== '') {
+            $lines[] = $footer;
+        } else {
+            $lines[] = 'Mình kiểm tra giúp em thông tin đã đúng chưa nhé.';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    public static function sanitizeQuickNoticeKeys(array $keys): array
+    {
+        $valid = array_keys(self::QUICK_NOTICE_LABELS);
+
+        return array_values(array_intersect(array_map('strval', $keys), $valid));
+    }
+
+    private static function appendQuickNotices(array &$lines, array $order, array $preferences): void
+    {
+        $selected = $order['quick_notice_keys'] ?? [];
+        if (is_string($selected)) {
+            $decoded = json_decode($selected, true);
+            $selected = is_array($decoded) ? $decoded : [];
+        }
+
+        foreach (self::sanitizeQuickNoticeKeys((array) $selected) as $noticeKey) {
+            $settingKey = self::QUICK_NOTICE_SETTING_KEYS[$noticeKey] ?? '';
+            $message = trim((string) ($preferences[$settingKey] ?? ''));
+            if ($message !== '') {
+                $lines[] = $message;
+            }
+        }
+    }
+
+    private static function appendBranchFooter(array &$lines, array $order, array $preferences): void
+    {
+        $orderType = (string) ($order['order_type'] ?? 'delivery');
+        $paymentName = trim((string) ($order['payment_name'] ?? ''));
+
+        $enabled = false;
+        $message = '';
+
+        if (!empty($preferences['copy_branch_notice_default_enabled'])) {
+            $enabled = true;
+            $message = (string) ($preferences['copy_branch_notice_default'] ?? '');
+        }
+
+        if ($paymentName === 'Chuyển khoản' && !empty($preferences['copy_branch_notice_bank_transfer_enabled'])) {
+            $enabled = true;
+            $message = (string) ($preferences['copy_branch_notice_bank_transfer'] ?? $message);
+        } elseif ($paymentName === 'COD' && !empty($preferences['copy_branch_notice_cod_enabled'])) {
+            $enabled = true;
+            $message = (string) ($preferences['copy_branch_notice_cod'] ?? $message);
+        } elseif ($orderType === 'pickup' && !empty($preferences['copy_branch_notice_scheduled_enabled'])) {
+            $enabled = true;
+            $message = (string) ($preferences['copy_branch_notice_scheduled'] ?? $message);
+        }
+
+        if ($enabled && trim($message) !== '') {
+            $lines[] = trim($message);
+        }
+
+        if (!empty($preferences['copy_branch_include_tag'])) {
+            $tag = self::branchTagForOrder($order, $preferences);
+            if ($tag !== '') {
+                $lines[] = $tag;
+            }
+        }
+    }
+
+    private static function branchTagForOrder(array $order, array $preferences): string
+    {
+        $defaultTag = trim((string) ($preferences['copy_branch_tag_text'] ?? ''));
+        $byBranch = $preferences['copy_branch_tag_by_branch'] ?? [];
+        if (is_string($byBranch)) {
+            $decoded = json_decode($byBranch, true);
+            $byBranch = is_array($decoded) ? $decoded : [];
+        }
+
+        $branchId = (string) ((int) ($order['branch_id'] ?? 0));
+        $branchTag = trim((string) ($byBranch[$branchId] ?? ''));
+
+        if ($branchTag !== '') {
+            return $branchTag;
+        }
+
+        if (!empty($preferences['copy_branch_tag_require_branch_match']) && $branchId === '0') {
+            return '';
+        }
+
+        return $defaultTag;
+    }
+
+    public static function typeLabel(string $type): string
     {
         return self::TYPE_LABELS[$type] ?? $type;
     }
@@ -432,135 +501,37 @@ class OrderModel
         return implode("\n", $lines);
     }
 
-    private static function generateBookingCustomerText(array $data, array $preferences): string
+    private static function formatItemsForCopy(array $items, bool $forCustomer): string
     {
-        $lines = [
-            'XÁC NHẬN ĐẶT BÀN',
-            '',
-        ];
-        self::appendCustomerIntro($lines, $preferences);
-        array_push(
-            $lines,
-            '• Tên khách: ' . trim((string) ($data['customer_name'] ?? '')),
-            '• SĐT: ' . trim((string) ($data['phone'] ?? '')),
-            '• Số lượng: ' . ((int) ($data['guest_count'] ?? 0) > 0 ? (int) $data['guest_count'] . ' khách' : 'Chưa nhập'),
-            '• Thời gian: ' . (trim((string) ($data['receive_time'] ?? '')) ?: 'Chưa nhập'),
-            '• Chi nhánh: ' . (trim((string) ($data['branch_name'] ?? '')) ?: 'Chưa chọn'),
-            '• Ghi chú: ' . (trim((string) ($data['note'] ?? '')) ?: 'Không có')
-        );
-        self::appendCustomerFooter($lines, $preferences);
+        $chunks = [];
+        foreach ($items as $item) {
+            $name = $forCustomer
+                ? (trim((string) ($item['customer_name'] ?? '')) ?: $item['item_name'])
+                : (trim((string) ($item['branch_name'] ?? '')) ?: $item['item_name']);
+            $quantity = (int) ($item['quantity'] ?? 0);
+            $note = trim((string) ($item['item_note'] ?? ''));
 
-        return implode("\n", $lines);
-    }
-
-    private static function appendBranchFooter(array &$lines, array $data, array $preferences): void
-    {
-        $footer = [];
-        $paymentName = (string) ($data['payment_name'] ?? '');
-        $payment = mb_strtolower(trim($paymentName), 'UTF-8');
-        if ($payment === 'chuyển khoản') {
-            self::pushFooterLine($footer, $preferences, 'copy_branch_notice_bank_transfer_enabled', 'copy_branch_notice_bank_transfer');
-        } else {
-            self::pushFooterLine($footer, $preferences, 'copy_branch_notice_default_enabled', 'copy_branch_notice_default');
-        }
-        if (str_contains($payment, 'cod')) {
-            self::pushFooterLine($footer, $preferences, 'copy_branch_notice_cod_enabled', 'copy_branch_notice_cod');
-        }
-        if (self::isScheduledDelivery($data)) {
-            self::pushFooterLine($footer, $preferences, 'copy_branch_notice_scheduled_enabled', 'copy_branch_notice_scheduled');
-        }
-
-        foreach (self::sanitizeQuickNoticeKeys($data['quick_notice_keys'] ?? []) as $quickNoticeKey) {
-            $settingKey = self::QUICK_NOTICE_SETTING_KEYS[$quickNoticeKey] ?? '';
-            if ($settingKey !== '') {
-                self::pushFooterLineByText($footer, (string) ($preferences[$settingKey] ?? ''));
+            $text = $quantity > 1 ? $name . ' x' . $quantity : $name;
+            if ($note !== '') {
+                $text .= ' (' . $note . ')';
             }
+            $chunks[] = $text;
         }
 
-        $tagText = self::branchTagText($data, $preferences);
-        if ($tagText !== '') {
-            $footer[] = $tagText;
-        }
-
-        if ($footer) {
-            $lines[] = '';
-            array_push($lines, ...$footer);
-        }
-    }
-
-    private static function pushFooterLine(array &$footer, array $preferences, string $enabledKey, string $textKey): void
-    {
-        if (empty($preferences[$enabledKey])) {
-            return;
-        }
-
-        $line = trim((string) ($preferences[$textKey] ?? ''));
-        if ($line !== '' && !in_array($line, $footer, true)) {
-            $footer[] = $line;
-        }
-    }
-
-    private static function pushFooterLineByText(array &$footer, string $line): void
-    {
-        $line = trim($line);
-        if ($line !== '' && !in_array($line, $footer, true)) {
-            $footer[] = $line;
-        }
-    }
-
-    private static function appendCustomerIntro(array &$lines, array $preferences): void
-    {
-        $intro = trim((string) ($preferences['customer_confirmation_intro'] ?? ''));
-        if ($intro === '') {
-            return;
-        }
-
-        $lines[] = $intro;
-        $lines[] = '';
-    }
-
-    private static function appendCustomerFooter(array &$lines, array $preferences): void
-    {
-        $footer = trim((string) ($preferences['customer_confirmation_footer'] ?? ''));
-        if ($footer === '') {
-            return;
-        }
-
-        $lines[] = '';
-        $lines[] = $footer;
-    }
-
-    private static function branchTagText(array $data, array $preferences): string
-    {
-        $branchId = (int) ($data['branch_id'] ?? 0);
-        $branchTags = (array) ($preferences['copy_branch_tag_by_branch'] ?? []);
-        if ($branchId > 0 && trim((string) ($branchTags[(string) $branchId] ?? '')) !== '') {
-            return trim((string) $branchTags[(string) $branchId]);
-        }
-
-        return trim((string) ($preferences['copy_branch_tag_text'] ?? ''));
-    }
-
-    private static function isScheduledDelivery(array $data): bool
-    {
-        if (($data['order_type'] ?? '') !== 'delivery') {
-            return false;
-        }
-
-        $time = mb_strtolower(trim((string) ($data['receive_time'] ?? '')), 'UTF-8');
-        if ($time === '' || $time === 'giao ngay') {
-            return false;
-        }
-
-        return !str_contains($time, 'ngay');
+        return implode(', ', $chunks);
     }
 
     private static function audit(string $action, string $subjectType, int $subjectId, array $payload = []): void
     {
-        $user = \current_user();
         Database::execute(
             'INSERT INTO audit_logs (user_id, action, subject_type, subject_id, payload) VALUES (?, ?, ?, ?, ?)',
-            [$user['id'] ?? null, $action, $subjectType, $subjectId, json_encode($payload, JSON_UNESCAPED_UNICODE)]
+            [
+                \current_user()['id'] ?? null,
+                $action,
+                $subjectType,
+                $subjectId,
+                $payload ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null,
+            ]
         );
     }
 }
