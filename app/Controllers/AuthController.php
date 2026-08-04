@@ -23,6 +23,7 @@ class AuthController extends Controller
 
         if ($username === '' || $password === '' || !Auth::attempt($username, $password)) {
             \flash('error', 'Tài khoản hoặc mật khẩu không đúng, hoặc tài khoản đã bị khóa.');
+            \flash('old_username', $username);
             \redirect('/login');
         }
 
