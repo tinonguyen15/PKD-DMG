@@ -1,17 +1,32 @@
 <?php
 $loginError = flash('error');
 $oldUsername = flash('old_username') ?: '';
+$logoUrl = url('/assets/images/logo.png');
+$loginBannerUrl = url('/assets/images/login-banner.png');
 ?>
 
 <main class="login-shell">
   <section class="login-hero" aria-label="Giới thiệu hệ thống">
     <div class="login-hero-card">
-      <div class="login-brand-mark">ĐMG</div>
-      <p class="login-kicker">Hệ thống nội bộ PKD</p>
-      <h1>Quản lý đơn hàng và tiếp nhận tập trung.</h1>
-      <p class="login-description">
-        Theo dõi đơn hàng, kênh tiếp nhận, chi nhánh và báo cáo vận hành trong một giao diện gọn gàng cho đội ngũ Đắng Mà Ghiền.
-      </p>
+      <div class="login-hero-brand">
+        <span class="login-brand-mark">
+          <img src="<?= e($logoUrl) ?>" alt="Đắng Mà Ghiền" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+          <b hidden>ĐMG</b>
+        </span>
+        <span>
+          <strong>PKD Đắng Mà Ghiền</strong>
+          <small>Web order nội bộ</small>
+        </span>
+      </div>
+
+      <div class="login-banner-frame">
+        <img src="<?= e($loginBannerUrl) ?>" alt="PKD Đắng Mà Ghiền" onerror="this.closest('.login-banner-frame').classList.add('is-fallback'); this.remove();">
+        <div class="login-banner-fallback">
+          <span>PKD</span>
+          <strong>Quản lý đơn hàng<br>và tiếp nhận tập trung</strong>
+          <small>Đơn hàng · Tiếp nhận · Báo cáo</small>
+        </div>
+      </div>
 
       <div class="login-feature-grid">
         <div>
@@ -33,7 +48,10 @@ $oldUsername = flash('old_username') ?: '';
   <section class="login-panel" aria-label="Đăng nhập hệ thống">
     <div class="login-card">
       <div class="login-card-head">
-        <div class="login-logo">PKD</div>
+        <span class="login-logo">
+          <img src="<?= e($logoUrl) ?>" alt="PKD Đắng Mà Ghiền" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+          <b hidden>PKD</b>
+        </span>
         <div>
           <p class="login-eyebrow">PKD ĐẮNG MÀ GHIỀN</p>
           <h2>Đăng nhập</h2>
