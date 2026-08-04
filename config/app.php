@@ -1,8 +1,10 @@
 <?php
 
 return [
-    'name' => 'PKD ĐMG',
-    'base_url' => getenv('APP_URL') ?: '',
-    'timezone' => 'Asia/Bangkok',
-    'session_name' => 'pkd_dmg_session',
+    'name' => getenv('APP_NAME') ?: 'PKD ĐMG',
+    'env' => getenv('APP_ENV') ?: 'production',
+    'base_url' => rtrim((string) (getenv('APP_URL') ?: ''), '/'),
+    'timezone' => getenv('APP_TIMEZONE') ?: 'Asia/Ho_Chi_Minh',
+    'debug' => filter_var(getenv('APP_DEBUG') ?: false, FILTER_VALIDATE_BOOLEAN),
+    'session_name' => getenv('APP_SESSION_NAME') ?: 'pkd_dmg_session',
 ];
