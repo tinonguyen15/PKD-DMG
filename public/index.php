@@ -1,0 +1,71 @@
+<?php
+
+declare(strict_types=1);
+
+require dirname(__DIR__) . '/app/bootstrap.php';
+
+use App\Controllers\AuthController;
+use App\Controllers\ContactController;
+use App\Controllers\DashboardController;
+use App\Controllers\OrderController;
+use App\Controllers\ProfileController;
+use App\Controllers\ReportController;
+use App\Controllers\SettingsController;
+use App\Core\Auth;
+use App\Core\Csrf;
+
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$path = rtrim($path, '/') ?: '/';
+$method = request_method();
+
+try {
+    if ($method === 'POST') {
+        Csrf::verify();
+    }
+
+    if ($path === '/login' && $method === 'GET') {
+        (new AuthController())->showLogin();
+        exit;
+    }
+    if ($path === '/login' && $method === 'POST') {
+        (new AuthController())->login();
+        exit;
+    }
+    if ($path === '/logout' && $method === 'POST') {
+        (new AuthController())->logout();
+        exit;
+    }
+
+    Auth::requireLogin();
+
+    match (true) {
+        $path === '/' => (new DashboardController())->index(),
+        $path === '/profile/settings' && $method === 'GET' => (new ProfileController())->settings(),
+        $path === '/profile/settings' && $method === 'POST' => (new ProfileController())->saveSettings(),
+        $path === '/orders/create' && $method === 'GET' => (new OrderController())->create(),
+        $path === '/orders/drafts' && $method === 'GET' => (new OrderController())->drafts(),
+        $path === '/orders/drafts' && $method === 'POST' => (new OrderController())->saveDraft(),
+        preg_match('#^/orders/drafts/(\d+)/delete$#', $path, $m) && $method === 'POST' => (new OrderController())->deleteDraft((int) $m[1]),
+        $path === '/orders' && $method === 'GET' => (new OrderController())->index(),
+        $path === '/orders' && $method === 'POST' => (new OrderController())->store(),
+        preg_match('#^/orders/(\d+)$#', $path, $m) && $method === 'GET' => (new OrderController())->show((int) $m[1]),
+        preg_match('#^/orders/(\d+)/status$#', $path, $m) && $method === 'POST' => (new OrderController())->status((int) $m[1]),
+        preg_match('#^/orders/(\d+)/copy-sent$#', $path, $m) && $method === 'POST' => (new OrderController())->markSentAfterCopy((int) $m[1]),
+        $path === '/contacts' && $method === 'GET' => (new ContactController())->index(),
+        $path === '/contacts' && $method === 'POST' => (new ContactController())->store(),
+        $path === '/reports/export' && $method === 'GET' => (new ReportController())->export(),
+        $path === '/reports' => (new ReportController())->index(),
+        $path === '/settings' => (new SettingsController())->index(),
+        $path === '/settings/catalog' && $method === 'POST' => (new SettingsController())->saveCatalog(),
+        $path === '/settings/users' && $method === 'POST' => (new SettingsController())->saveUser(),
+        $path === '/settings/system-preferences' && $method === 'POST' => (new SettingsController())->saveSystemPreferences(),
+        default => (function () {
+            http_response_code(404);
+            echo 'Không tìm thấy trang.';
+        })(),
+    };
+} catch (Throwable $exception) {
+    http_response_code(500);
+    $message = getenv('APP_DEBUG') ? $exception->getMessage() : 'Có lỗi hệ thống. Vui lòng thử lại.';
+    echo '<h1>Lỗi</h1><p>' . e($message) . '</p>';
+}

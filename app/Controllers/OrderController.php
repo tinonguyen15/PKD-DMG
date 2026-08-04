@@ -1,0 +1,287 @@
+<?php
+
+namespace App\Controllers;
+
+use App\Core\Controller;
+use App\Models\CatalogModel;
+use App\Models\OrderDraftModel;
+use App\Models\OrderModel;
+use App\Models\PreferenceModel;
+use App\Models\ReportModel;
+
+class OrderController extends Controller
+{
+    public function create(): void
+    {
+        $userId = (int) \current_user()['id'];
+        $preferences = PreferenceModel::resolved($userId);
+        $favoriteItemIds = array_map('intval', (array) ($preferences['favorite_menu_item_ids'] ?? []));
+        $recentItemIds = !empty($preferences['show_recent_menu_items_first'])
+            ? OrderModel::recentMenuItemIds($userId)
+            : [];
+
+        $this->view('orders/create', [
+            'title' => 'Tạo đơn',
+            'branches' => CatalogModel::branches(),
+            'categories' => CatalogModel::menuCategories(),
+            'items' => $this->sortedMenuItems(CatalogModel::menuItems(), $favoriteItemIds, $recentItemIds),
+            'sources' => CatalogModel::orderSources(),
+            'payments' => CatalogModel::paymentMethods(),
+            'orderPreferences' => $preferences,
+            'quickNoticeLabels' => OrderModel::quickNoticeLabelsForPreferences($preferences),
+            'favoriteItemIds' => $favoriteItemIds,
+            'recentItemIds' => $recentItemIds,
+            'drafts' => OrderDraftModel::forUser($userId),
+            'old' => \flash('old') ?: [],
+            'errors' => \flash('errors') ?: [],
+        ]);
+    }
+
+    public function store(): void
+    {
+        $orderType = $this->orderType((string) \input('order_type', 'delivery'));
+        $items = $orderType === 'booking'
+            ? []
+            : OrderModel::prepareItems($_POST['items'] ?? [], $_POST['item_notes'] ?? []);
+
+        $branch = $this->findById(CatalogModel::branches(), (int) \input('branch_id'));
+        $source = $this->findById(CatalogModel::orderSources(), (int) \input('source_id'));
+        $payment = $this->findById(CatalogModel::paymentMethods(), (int) \input('payment_method_id'));
+        $errors = $this->validateOrder($items, $orderType, $payment);
+
+        if ($errors) {
+            \flash('errors', $errors);
+            \flash('old', $_POST);
+            \redirect('/orders/create');
+        }
+
+        $data = [
+            'user_id' => \current_user()['id'],
+            'branch_id' => (int) \input('branch_id'),
+            'branch_name' => $branch['name'] ?? '',
+            'source_id' => (int) \input('source_id'),
+            'source_name' => $source['name'] ?? '',
+            'payment_method_id' => $orderType === 'booking' ? 0 : (int) \input('payment_method_id'),
+            'payment_name' => $payment['name'] ?? '',
+            'order_type' => $orderType,
+            'status_label' => '',
+            'customer_name' => trim((string) \input('customer_name', '')),
+            'phone' => trim((string) \input('phone', '')),
+            'address' => $orderType === 'delivery' ? trim((string) \input('address', '')) : '',
+            'receive_time' => trim((string) \input('receive_time', '')),
+            'guest_count' => $orderType === 'booking' ? (int) \input('guest_count', 0) : null,
+            'note' => $orderType === 'booking' ? trim((string) \input('note', '')) : '',
+            'quick_notice_keys' => OrderModel::sanitizeQuickNoticeKeys($_POST['quick_notices'] ?? []),
+        ];
+
+        $orderId = OrderModel::create($data, $items);
+        OrderDraftModel::deleteForUser((int) \input('draft_id', 0), (int) \current_user()['id']);
+        PreferenceModel::rememberLastOrderChoices((int) \current_user()['id'], $data);
+        \flash('success', 'Đã lưu đơn mới.');
+        \redirect('/orders/' . $orderId);
+    }
+
+    public function index(): void
+    {
+        $filters = [
+            'date_from' => \input('date_from', \today()),
+            'date_to' => \input('date_to', \today()),
+            'workflow_status' => \input('workflow_status', ''),
+            'branch_id' => \input('branch_id', ''),
+            'source_id' => \input('source_id', ''),
+            'order_type' => \input('order_type', ''),
+            'user_id' => \input('user_id', ''),
+            'q' => trim((string) \input('q', '')),
+        ];
+
+        $this->view('orders/index', [
+            'title' => 'Đơn hàng',
+            'orders' => OrderModel::all($filters),
+            'filters' => $filters,
+            'branches' => CatalogModel::branches(),
+            'sources' => CatalogModel::orderSources(),
+            'users' => CatalogModel::users(true),
+            'workflowLabels' => OrderModel::WORKFLOW_LABELS,
+            'typeLabels' => OrderModel::TYPE_LABELS,
+        ]);
+    }
+
+    public function show(int $id): void
+    {
+        $order = OrderModel::find($id);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Không tìm thấy đơn.';
+            return;
+        }
+        $order = ReportModel::withEstimatedGuestMetrics([$order])[0] ?? $order;
+
+        $this->view('orders/show', [
+            'title' => $order['order_code'],
+            'order' => $order,
+            'branchText' => OrderModel::generateBranchText($order, $order['items']),
+            'customerText' => OrderModel::generateCustomerText($order),
+            'copyPreferences' => PreferenceModel::resolved((int) \current_user()['id']),
+            'workflowLabels' => OrderModel::WORKFLOW_LABELS,
+            'typeLabels' => OrderModel::TYPE_LABELS,
+        ]);
+    }
+
+    public function status(int $id): void
+    {
+        $status = (string) \input('workflow_status', '');
+        OrderModel::updateStatus($id, $status);
+        \flash('success', 'Đã cập nhật trạng thái đơn.');
+        \redirect((string) ($_SERVER['HTTP_REFERER'] ?? '/orders'));
+    }
+
+    public function markSentAfterCopy(int $id): void
+    {
+        $preferences = PreferenceModel::resolved((int) \current_user()['id']);
+        if (empty($preferences['auto_mark_sent_on_branch_copy'])) {
+            $this->json(['changed' => false, 'reason' => 'disabled']);
+        }
+
+        $order = OrderModel::find($id);
+        if (!$order) {
+            $this->json(['changed' => false, 'message' => 'Không tìm thấy đơn.'], 404);
+        }
+
+        if (($order['workflow_status'] ?? '') !== 'processing') {
+            $this->json([
+                'changed' => false,
+                'status' => $order['workflow_status'],
+                'label' => OrderModel::workflowLabel((string) $order['workflow_status']),
+            ]);
+        }
+
+        OrderModel::updateStatus($id, 'sent');
+        $this->json(['changed' => true, 'status' => 'sent', 'label' => OrderModel::workflowLabel('sent')]);
+    }
+
+    public function drafts(): void
+    {
+        $this->json(['drafts' => OrderDraftModel::forUser((int) \current_user()['id'])]);
+    }
+
+    public function saveDraft(): void
+    {
+        $payloadJson = (string) \input('payload_json', '{}');
+        $payload = json_decode($payloadJson, true);
+        if (!is_array($payload)) {
+            $this->json(['message' => 'Dữ liệu nháp không hợp lệ.'], 422);
+        }
+
+        $draft = OrderDraftModel::save(
+            (int) \current_user()['id'],
+            (int) \input('draft_id', 0),
+            $payload
+        );
+
+        $this->json(['draft' => $draft, 'drafts' => OrderDraftModel::forUser((int) \current_user()['id'])]);
+    }
+
+    public function deleteDraft(int $id): void
+    {
+        OrderDraftModel::deleteForUser($id, (int) \current_user()['id']);
+        $this->json(['deleted' => true, 'drafts' => OrderDraftModel::forUser((int) \current_user()['id'])]);
+    }
+
+    private function validateOrder(array $items, string $orderType, ?array $payment): array
+    {
+        $errors = [];
+        if (trim((string) \input('customer_name', '')) === '') {
+            $errors[] = 'Tên khách là bắt buộc.';
+        }
+        if (trim((string) \input('phone', '')) === '') {
+            $errors[] = 'Số điện thoại là bắt buộc.';
+        }
+        if ((int) \input('branch_id') <= 0) {
+            $errors[] = 'Vui lòng chọn chi nhánh.';
+        }
+        if ((int) \input('source_id') <= 0) {
+            $errors[] = 'Vui lòng chọn nguồn đơn.';
+        }
+        if ($orderType !== 'booking' && (int) \input('payment_method_id') <= 0) {
+            $errors[] = 'Vui lòng chọn hình thức thanh toán.';
+        }
+        if ($orderType !== 'booking' && $payment && !in_array($payment['name'], $this->allowedPayments($orderType), true)) {
+            $errors[] = 'Hình thức thanh toán không đúng với loại đơn.';
+        }
+        if ($orderType !== 'booking' && !$items) {
+            $errors[] = 'Vui lòng chọn ít nhất một món.';
+        }
+        if ($orderType === 'booking' && (int) \input('guest_count', 0) <= 0) {
+            $errors[] = 'Vui lòng nhập số lượng khách đặt bàn.';
+        }
+        if ($orderType === 'booking' && trim((string) \input('receive_time', '')) === '') {
+            $errors[] = 'Vui lòng nhập thời gian đặt bàn.';
+        }
+
+        return $errors;
+    }
+
+    private function orderType(string $type): string
+    {
+        return array_key_exists($type, OrderModel::TYPE_LABELS) ? $type : 'delivery';
+    }
+
+    private function findById(array $rows, int $id): ?array
+    {
+        foreach ($rows as $row) {
+            if ((int) $row['id'] === $id) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    private function allowedPayments(string $orderType): array
+    {
+        return match ($orderType) {
+            'delivery' => ['COD', 'Chuyển khoản'],
+            'pickup' => ['Thanh toán khi ghé lấy', 'Đã thanh toán trước'],
+            default => [],
+        };
+    }
+
+    private function sortedMenuItems(array $items, array $favoriteItemIds, array $recentItemIds): array
+    {
+        $favoriteRank = array_flip(array_values(array_unique(array_map('intval', $favoriteItemIds))));
+        $recentRank = array_flip(array_values(array_unique(array_map('intval', $recentItemIds))));
+
+        foreach ($items as $index => &$item) {
+            $item['_original_index'] = $index;
+        }
+        unset($item);
+
+        usort($items, static function (array $a, array $b) use ($favoriteRank, $recentRank): int {
+            $aId = (int) ($a['id'] ?? 0);
+            $bId = (int) ($b['id'] ?? 0);
+            $aBucket = isset($favoriteRank[$aId]) ? 0 : (isset($recentRank[$aId]) ? 1 : 2);
+            $bBucket = isset($favoriteRank[$bId]) ? 0 : (isset($recentRank[$bId]) ? 1 : 2);
+
+            if ($aBucket !== $bBucket) {
+                return $aBucket <=> $bBucket;
+            }
+
+            if ($aBucket === 0 && $favoriteRank[$aId] !== $favoriteRank[$bId]) {
+                return $favoriteRank[$aId] <=> $favoriteRank[$bId];
+            }
+
+            if ($aBucket === 1 && $recentRank[$aId] !== $recentRank[$bId]) {
+                return $recentRank[$aId] <=> $recentRank[$bId];
+            }
+
+            return ((int) ($a['_original_index'] ?? 0)) <=> ((int) ($b['_original_index'] ?? 0));
+        });
+
+        foreach ($items as &$item) {
+            unset($item['_original_index']);
+        }
+        unset($item);
+
+        return $items;
+    }
+}

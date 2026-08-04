@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "DMG Order & KPI",
+  "description": "Cong cu tao don, tinh tien nhanh va xem KPI local cho Lau Kho Qua Rung Dang Ma Ghien.",
+  "version": "1.0.0",
+  "action": {
+    "default_title": "DMG Order"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "clipboardWrite",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://facebook.com/*",
+    "https://*.facebook.com/*",
+    "https://messenger.com/*",
+    "https://*.messenger.com/*"
+  ],
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "32": "assets/icons/icon32.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  }
+}

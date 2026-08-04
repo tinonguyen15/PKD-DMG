@@ -1,0 +1,36 @@
+# Tài khoản nhân viên
+
+1.
+- Giao diện order
++ Coppy nhanh thông tin order
++ Nguồn đơn (fb ads, fb, OA,...)
++ Phân loại đơn
++ Thêm số lượng khách - theo món định sẵn (cho phép và ưu tiên nhập tay)
++ Phân loại chi nhánh
++ Phân loại thánh toán
+
+- Đơn hàng
++ Giao diện trạng thái - Đã xóa => Đã hủy
++ 
+
+
+
+2 Báo cáo
+- Báo cáo tổng
++ SL đơn
++ Doanh thu
++ TB /đơn
++ TB khách hàng
+
+- Theo Chi nhánh
+
+- Theo Nhân viên
+
+- Theo nguồn
+
+- Theo loại (MV, ghé lấy, đặt bàn,...)
+
+3. Tiếp cận (Nhập thủ công cuối ngày)
+- Nhập báo cáo tiếp cận cuối ngày (SL khách gọi, khách ib zalo,... theo CN. Phân càng rõ càng tốt)
+
+4. 
