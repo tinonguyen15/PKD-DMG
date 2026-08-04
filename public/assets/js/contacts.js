@@ -23,22 +23,37 @@
     setTimeout(() => node.remove(), 2200);
   }
 
+  function fingerprint(input) {
+    return [
+      input.dataset.contactReportDate || '',
+      input.dataset.contactBranchId || '',
+      input.dataset.contactChannel || '',
+      Math.max(0, parseInt(input.value || '0', 10))
+    ].join('|');
+  }
+
   async function saveReceived(input) {
-    const id = parseInt(input.dataset.contactId || '0', 10);
-    if (!id) return;
+    const reportDate = input.dataset.contactReportDate || '';
+    const branchId = parseInt(input.dataset.contactBranchId || '0', 10);
+    const channel = input.dataset.contactChannel || '';
+    if (!reportDate || !branchId || !channel) return;
 
     const value = Math.max(0, parseInt(input.value || '0', 10));
     input.value = String(value);
 
-    const fingerprint = `${id}:${value}`;
-    if (input.dataset.lastSaved === fingerprint) return;
+    const nextFingerprint = fingerprint(input);
+    if (input.dataset.lastSaved === nextFingerprint) return;
 
     const formData = new FormData();
     formData.append('_csrf', csrf);
-    formData.append('id', String(id));
+    formData.append('action', 'save_received');
+    formData.append('report_date', reportDate);
+    formData.append('branch_id', String(branchId));
+    formData.append('channel', channel);
     formData.append('received_count', String(value));
 
     input.dataset.saving = '1';
+    input.classList.add('is-saving');
 
     try {
       const response = await fetch(saveUrl, {
@@ -63,12 +78,13 @@
         return;
       }
 
-      input.dataset.lastSaved = fingerprint;
+      input.dataset.lastSaved = nextFingerprint;
       toast(payload && payload.message ? payload.message : 'Đã tự lưu');
     } catch (error) {
       toast('Mất kết nối, chưa tự lưu được');
     } finally {
       input.dataset.saving = '0';
+      input.classList.remove('is-saving');
     }
   }
 
@@ -81,7 +97,7 @@
   }
 
   document.querySelectorAll('[data-contact-received]').forEach((input) => {
-    input.dataset.lastSaved = `${input.dataset.contactId || '0'}:${Math.max(0, parseInt(input.value || '0', 10))}`;
+    input.dataset.lastSaved = fingerprint(input);
   });
 
   document.addEventListener('input', (event) => {
