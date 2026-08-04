@@ -6,8 +6,8 @@
   </div>
 <?php endif; ?>
 
-<section class="content-grid two">
-  <form class="panel stack" method="post" action="<?= e(url('/contacts')) ?>">
+<section class="content-grid one">
+  <!-- <form class="panel stack" method="post" action="<?= e(url('/contacts')) ?>">
     <?= csrf_field() ?>
     <div class="section-head">
       <h2>Tiếp cận</h2>
@@ -57,7 +57,7 @@
       </label>
     </div>
     <button class="btn primary" type="submit">Lưu tiếp cận</button>
-  </form>
+  </form> -->
 
   <form class="panel filter-grid" method="get" action="<?= e(url('/contacts')) ?>">
     <div class="section-head wide">
@@ -108,9 +108,8 @@
           <th>Chi nhánh</th>
           <th>Kênh</th>
           <th>Tiếp nhận</th>
-          <th>Đủ ĐK</th>
-          <th>Chốt</th>
-          <th>Hủy</th>
+          <th>Đơn hàng</th>
+          <th>Doanh số</th>
           <th>Ghi chú</th>
         </tr>
       </thead>
@@ -122,9 +121,7 @@
             <td><?= e($row['branch_name']) ?></td>
             <td><?= e($channels[$row['channel']] ?? $row['channel']) ?></td>
             <td><?= (int) $row['received_count'] ?></td>
-            <td><?= (int) $row['qualified_count'] ?></td>
             <td><?= (int) $row['order_count'] ?></td>
-            <td><?= (int) $row['cancelled_count'] ?></td>
             <td><?= e($row['note']) ?></td>
           </tr>
         <?php endforeach; ?>
