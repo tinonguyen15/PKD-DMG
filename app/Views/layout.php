@@ -6,12 +6,46 @@
   <title><?= e($title ?? config('app.name')) ?> - <?= e(config('app.name')) ?></title>
   <link rel="stylesheet" href="<?= e(url('/assets/css/app.css')) ?>">
   <link rel="stylesheet" href="<?= e(url('/assets/css/sidebar.css?v=20260805-1')) ?>">
-  <link rel="stylesheet" href="<?= e(url('/assets/css/brand-assets.css?v=20260805-1')) ?>">
+  <link rel="stylesheet" href="<?= e(url('/assets/css/brand-assets.css?v=20260805-2')) ?>">
 </head>
 <body>
   <?php
     $user = current_user();
-    $logoUrl = url('/assets/images/logo.png');
+
+    $assetImageUrl = static function (array $preferredNames, array $fallbackPatterns = []): ?string {
+        $imageDir = dirname(__DIR__, 2) . '/public/assets/images';
+        $allowedExtensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'];
+
+        $toUrl = static function (string $filename): string {
+            return url('/assets/images/' . rawurlencode($filename));
+        };
+
+        foreach ($preferredNames as $name) {
+            $name = basename((string) $name);
+            $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if ($name !== '' && in_array($extension, $allowedExtensions, true) && is_file($imageDir . '/' . $name)) {
+                return $toUrl($name);
+            }
+        }
+
+        foreach ($fallbackPatterns as $pattern) {
+            foreach (glob($imageDir . '/' . $pattern) ?: [] as $path) {
+                $name = basename($path);
+                $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                if (in_array($extension, $allowedExtensions, true) && is_file($path)) {
+                    return $toUrl($name);
+                }
+            }
+        }
+
+        return null;
+    };
+
+    $logoUrl = $assetImageUrl(
+        ['logo.png', 'logo.webp', 'logo.jpg', 'logo.jpeg', 'dmg-logo.png', 'pkd-logo.png', 'brand-logo.png', 'dmh-logo.png'],
+        ['*logo*.png', '*logo*.webp', '*logo*.jpg', '*logo*.jpeg', '*Logo*.png', '*Logo*.webp', '*dmg*.png', '*DMG*.png']
+    );
+
     $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
     $currentPath = '/' . trim($currentPath, '/');
     $currentPath = $currentPath === '/' ? '/' : rtrim($currentPath, '/');
@@ -79,13 +113,16 @@
     <aside class="sidebar" aria-label="Menu chính">
       <div class="sidebar-top">
         <a class="brand" href="<?= e(url('/')) ?>" aria-label="Về tổng quan">
-          <span class="brand-mark">
-            <img src="<?= e($logoUrl) ?>" alt="Đắng Mà Ghiền" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
-            <b hidden>ĐMG</b>
+          <span class="brand-mark <?= $logoUrl ? 'has-image' : '' ?>">
+            <?php if ($logoUrl): ?>
+              <img src="<?= e($logoUrl) ?>" alt="Đắng Mà Ghiền">
+            <?php else: ?>
+              <b>ĐMG</b>
+            <?php endif; ?>
           </span>
           <span class="brand-copy">
             <strong>PKD ĐMG</strong>
-            <small>Web order nội bộ</small>
+            <small>Order nội bộ</small>
           </span>
         </a>
 
