@@ -43,6 +43,8 @@ try {
         $path === '/profile/settings' && $method === 'GET' => (new ProfileController())->settings(),
         $path === '/profile/settings' && $method === 'POST' => (new ProfileController())->saveSettings(),
         $path === '/orders/create' && $method === 'GET' => (new OrderController())->create(),
+        $path === '/orders/customer-lookup' && $method === 'GET' => (new OrderController())->customerLookup(),
+        $path === '/orders/customer-blacklist' && $method === 'POST' => (new OrderController())->customerBlacklist(),
         $path === '/orders/drafts' && $method === 'GET' => (new OrderController())->drafts(),
         $path === '/orders/drafts' && $method === 'POST' => (new OrderController())->saveDraft(),
         preg_match('#^/orders/drafts/(\d+)/delete$#', $path, $m) && $method === 'POST' => (new OrderController())->deleteDraft((int) $m[1]),
