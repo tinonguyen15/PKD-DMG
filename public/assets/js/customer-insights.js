@@ -78,6 +78,13 @@
     lastPayload = null;
   }
 
+  function itemSummary(order) {
+    const items = Array.isArray(order.items) ? order.items : [];
+    if (!items.length) return 'Chưa có dữ liệu món';
+    const names = items.slice(0, 3).map((item) => `${Number(item.quantity || 0)} ${item.customer_name || item.item_name || 'món'}`);
+    return `${names.join(', ')}${items.length > 3 ? ` +${items.length - 3} món` : ''}`;
+  }
+
   function render(payload) {
     lastPayload = payload;
     const customer = payload.customer || {};
@@ -139,16 +146,25 @@
 
     if (orders) {
       orders.innerHTML = recentOrders.length
-        ? `<strong class="customer-orders-title">Đơn gần đây</strong>${recentOrders.map((order) => `
-            <a class="customer-order-row" href="/orders/${Number(order.id)}" target="_blank" rel="noopener">
-              <span>
-                <b>${escapeHtml(order.order_code)}</b>
-                <small>${escapeHtml(dateText(order.created_at))} · ${escapeHtml(orderTypeLabel(order.order_type))} · ${escapeHtml(order.branch_name || 'Chưa CN')}</small>
-              </span>
-              <em class="status-${escapeHtml(order.workflow_status)}">${escapeHtml(statusLabel(order.workflow_status))}</em>
-              <strong>${money(order.total || 0)}</strong>
-            </a>
-          `).join('')}`
+        ? `<strong class="customer-orders-title">Đơn gần đây</strong>${recentOrders.map((order) => {
+            const hasReusableItems = Array.isArray(order.items) && order.items.some((item) => Number(item.menu_item_id || 0) > 0 && Number(item.quantity || 0) > 0);
+            return `
+              <div class="customer-order-row">
+                <a class="customer-order-main" href="/orders/${Number(order.id)}" target="_blank" rel="noopener">
+                  <span>
+                    <b>${escapeHtml(order.order_code)}</b>
+                    <small>${escapeHtml(dateText(order.created_at))} · ${escapeHtml(orderTypeLabel(order.order_type))} · ${escapeHtml(order.branch_name || 'Chưa CN')}</small>
+                    <i>${escapeHtml(itemSummary(order))}</i>
+                  </span>
+                </a>
+                <em class="status-${escapeHtml(order.workflow_status)}">${escapeHtml(statusLabel(order.workflow_status))}</em>
+                <strong>${money(order.total || 0)}</strong>
+                <button class="btn ghost small-btn reuse-items-btn" type="button" data-reuse-order="${Number(order.id)}" ${hasReusableItems ? '' : 'disabled'}>
+                  Dùng lại món
+                </button>
+              </div>
+            `;
+          }).join('')}`
         : '';
     }
 
@@ -226,8 +242,79 @@
     render(payload);
   }
 
+  function setRadioValue(name, value) {
+    const input = form.querySelector(`[name="${name}"][value="${CSS.escape(String(value))}"]`);
+    if (!input) return false;
+    input.checked = true;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
+  function reuseOrderItems(orderId) {
+    const order = (lastPayload?.recent_orders || []).find((item) => Number(item.id) === Number(orderId));
+    const items = Array.isArray(order?.items) ? order.items : [];
+    if (!items.length) {
+      alert('Đơn cũ này chưa có dữ liệu món để dùng lại.');
+      return;
+    }
+
+    if (['delivery', 'pickup'].includes(order.order_type)) {
+      setRadioValue('order_type', order.order_type);
+    } else {
+      setRadioValue('order_type', 'delivery');
+    }
+
+    form.querySelectorAll("[name^='items[']").forEach((input) => {
+      input.value = '0';
+    });
+    form.querySelectorAll("[name^='item_notes[']").forEach((input) => {
+      input.value = '';
+    });
+
+    let applied = 0;
+    const grouped = new Map();
+    items.forEach((item) => {
+      const id = Number(item.menu_item_id || 0);
+      const quantity = Number(item.quantity || 0);
+      if (id <= 0 || quantity <= 0) return;
+      const current = grouped.get(id) || { quantity: 0, note: '' };
+      current.quantity += quantity;
+      if (item.item_note) current.note = item.item_note;
+      grouped.set(id, current);
+    });
+
+    grouped.forEach((value, id) => {
+      const quantityInput = form.querySelector(`[name="items[${CSS.escape(String(id))}]"]`);
+      if (!quantityInput) return;
+      quantityInput.value = String(value.quantity);
+      const noteInput = form.querySelector(`[name="item_notes[${CSS.escape(String(id))}]"]`);
+      if (noteInput && value.note) noteInput.value = value.note;
+      applied += 1;
+    });
+
+    form.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (applied > 0) {
+      const firstQty = form.querySelector("[name^='items['][value]:not([value='0'])");
+      firstQty?.closest('[data-menu-card]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    alert(applied > 0
+      ? `Đã dùng lại ${applied} món từ đơn ${order.order_code || ''}.`
+      : 'Các món trong đơn cũ không còn khớp menu hiện tại, không áp dụng được.'
+    );
+  }
+
   phoneInput.addEventListener('input', scheduleLookup);
   phoneInput.addEventListener('change', scheduleLookup);
+
+  panel.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-reuse-order]');
+    if (!button) return;
+    event.preventDefault();
+    reuseOrderItems(button.dataset.reuseOrder);
+  });
 
   fillButton?.addEventListener('click', () => {
     if (!lastPayload) return;
