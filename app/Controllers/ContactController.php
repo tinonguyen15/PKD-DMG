@@ -21,7 +21,7 @@ class ContactController extends Controller
         ];
 
         $this->view('contacts/index', [
-            'title' => 'Tiếp cận',
+            'title' => 'Tiếp nhận',
             'filters' => $filters,
             'rows' => ContactModel::all($filters),
             'branches' => CatalogModel::branches(),
@@ -29,9 +29,8 @@ class ContactController extends Controller
             'channels' => ContactModel::CHANNELS,
             'old' => \flash('old') ?: [
                 'report_date' => \today(),
-                'user_id' => \current_user()['id'],
                 'branch_id' => $preferences['default_contact_branch_id'] ?? 0,
-                'channel' => $preferences['default_contact_channel'] ?? 'hotline_1900',
+                'channel' => $preferences['default_contact_channel'] ?? 'zalo_oa',
             ],
             'errors' => \flash('errors') ?: [],
         ]);
@@ -39,41 +38,66 @@ class ContactController extends Controller
 
     public function store(): void
     {
-        $userId = \is_admin() ? (int) \input('user_id', \current_user()['id']) : (int) \current_user()['id'];
+        if ((int) \input('id', 0) > 0) {
+            ContactModel::saveReceivedCount(
+                (int) \input('id'),
+                (int) \input('received_count', 0)
+            );
+            $this->savedResponse('Đã tự lưu tiếp nhận.');
+        }
+
         $data = [
             'report_date' => (string) \input('report_date', \today()),
-            'user_id' => $userId,
+            'user_id' => (int) \current_user()['id'],
             'branch_id' => (int) \input('branch_id'),
             'channel' => (string) \input('channel', ''),
-            'received_count' => (int) \input('received_count', 0),
-            'qualified_count' => (int) \input('qualified_count', 0),
-            'order_count' => (int) \input('order_count', 0),
-            'cancelled_count' => (int) \input('cancelled_count', 0),
-            'note' => (string) \input('note', ''),
         ];
 
         $errors = [];
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['report_date'])) {
-            $errors[] = 'Ngày báo cáo không hợp lệ.';
-        }
-        if ($data['user_id'] <= 0) {
-            $errors[] = 'Vui lòng chọn nhân viên.';
+            $errors[] = 'Ngày tiếp nhận không hợp lệ.';
         }
         if ($data['branch_id'] <= 0) {
             $errors[] = 'Vui lòng chọn chi nhánh.';
         }
         if (!isset(ContactModel::CHANNELS[$data['channel']])) {
-            $errors[] = 'Kênh tiếp cận không hợp lệ.';
+            $errors[] = 'Kênh tiếp nhận không hợp lệ.';
         }
 
         if ($errors) {
-            \flash('errors', $errors);
-            \flash('old', $_POST);
-            \redirect('/contacts');
+            $this->errorResponse($errors, $_POST);
         }
 
-        ContactModel::upsert($data);
-        \flash('success', 'Đã lưu báo cáo tiếp cận.');
-        \redirect('/contacts?date_from=' . urlencode($data['report_date']) . '&date_to=' . urlencode($data['report_date']));
+        ContactModel::ensureRow($data);
+        $this->savedResponse('Đã thêm dòng tiếp nhận.');
+    }
+
+    private function savedResponse(string $message): void
+    {
+        if ($this->wantsJson()) {
+            $this->json(['success' => true, 'message' => $message]);
+        }
+
+        \flash('success', $message);
+        \redirect('/contacts?date_from=' . urlencode((string) \input('report_date', \today())) . '&date_to=' . urlencode((string) \input('report_date', \today())));
+    }
+
+    private function errorResponse(array $errors, array $old): void
+    {
+        if ($this->wantsJson()) {
+            $this->json(['success' => false, 'message' => implode(' ', $errors), 'errors' => $errors], 422);
+        }
+
+        \flash('errors', $errors);
+        \flash('old', $old);
+        \redirect('/contacts');
+    }
+
+    private function wantsJson(): bool
+    {
+        $requestedWith = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+
+        return $requestedWith === 'xmlhttprequest' || str_contains($accept, 'application/json');
     }
 }
