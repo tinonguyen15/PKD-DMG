@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
   price INT UNSIGNED NOT NULL DEFAULT 0,
   unit VARCHAR(40) NOT NULL DEFAULT 'phần',
   image_path VARCHAR(255) NULL,
+  estimated_guest_count INT UNSIGNED NOT NULL DEFAULT 0,
   active TINYINT(1) NOT NULL DEFAULT 1,
   sort_order INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -121,7 +122,31 @@ CREATE TABLE IF NOT EXISTS orders (
   CONSTRAINT fk_orders_payment FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id),
   INDEX idx_orders_date_status (created_at, workflow_status),
   INDEX idx_orders_user_date (user_id, created_at),
-  INDEX idx_orders_branch_source (branch_id, source_id)
+  INDEX idx_orders_branch_source (branch_id, source_id),
+  INDEX idx_orders_phone_created (phone, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customers (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  phone_normalized VARCHAR(30) NOT NULL UNIQUE,
+  phone_display VARCHAR(40) NOT NULL,
+  name VARCHAR(160) NULL,
+  address VARCHAR(255) NULL,
+  last_branch_id INT UNSIGNED NULL,
+  last_source_id INT UNSIGNED NULL,
+  last_order_id BIGINT UNSIGNED NULL,
+  is_blacklisted TINYINT(1) NOT NULL DEFAULT 0,
+  blacklist_reason VARCHAR(255) NULL,
+  notes VARCHAR(500) NULL,
+  first_order_at DATETIME NULL,
+  last_order_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_customers_last_branch FOREIGN KEY (last_branch_id) REFERENCES branches(id) ON DELETE SET NULL,
+  CONSTRAINT fk_customers_last_source FOREIGN KEY (last_source_id) REFERENCES order_sources(id) ON DELETE SET NULL,
+  CONSTRAINT fk_customers_last_order FOREIGN KEY (last_order_id) REFERENCES orders(id) ON DELETE SET NULL,
+  INDEX idx_customers_blacklist (is_blacklisted, updated_at),
+  INDEX idx_customers_last_order_at (last_order_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS order_drafts (
