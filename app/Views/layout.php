@@ -6,34 +6,47 @@
   <title><?= e($title ?? config('app.name')) ?> - <?= e(config('app.name')) ?></title>
   <link rel="stylesheet" href="<?= e(url('/assets/css/app.css')) ?>">
   <link rel="stylesheet" href="<?= e(url('/assets/css/sidebar.css?v=20260805-1')) ?>">
-  <link rel="stylesheet" href="<?= e(url('/assets/css/brand-assets.css?v=20260805-2')) ?>">
+  <link rel="stylesheet" href="<?= e(url('/assets/css/brand-assets.css?v=20260805-3')) ?>">
 </head>
 <body>
   <?php
     $user = current_user();
 
     $assetImageUrl = static function (array $preferredNames, array $fallbackPatterns = []): ?string {
-        $imageDir = dirname(__DIR__, 2) . '/public/assets/images';
+        $imageRoot = dirname(__DIR__, 2) . '/public/assets/images';
         $allowedExtensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'];
+        $searchDirectories = [
+            ['dir' => $imageRoot, 'url' => '/assets/images'],
+            ['dir' => $imageRoot . '/lib', 'url' => '/assets/images/lib'],
+        ];
 
-        $toUrl = static function (string $filename): string {
-            return url('/assets/images/' . rawurlencode($filename));
+        $toUrl = static function (string $baseUrl, string $filename): string {
+            return url(rtrim($baseUrl, '/') . '/' . rawurlencode($filename));
         };
 
         foreach ($preferredNames as $name) {
             $name = basename((string) $name);
             $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-            if ($name !== '' && in_array($extension, $allowedExtensions, true) && is_file($imageDir . '/' . $name)) {
-                return $toUrl($name);
+            if ($name === '' || !in_array($extension, $allowedExtensions, true)) {
+                continue;
+            }
+
+            foreach ($searchDirectories as $directory) {
+                $path = $directory['dir'] . '/' . $name;
+                if (is_file($path)) {
+                    return $toUrl($directory['url'], $name);
+                }
             }
         }
 
         foreach ($fallbackPatterns as $pattern) {
-            foreach (glob($imageDir . '/' . $pattern) ?: [] as $path) {
-                $name = basename($path);
-                $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-                if (in_array($extension, $allowedExtensions, true) && is_file($path)) {
-                    return $toUrl($name);
+            foreach ($searchDirectories as $directory) {
+                foreach (glob($directory['dir'] . '/' . $pattern) ?: [] as $path) {
+                    $name = basename($path);
+                    $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                    if (in_array($extension, $allowedExtensions, true) && is_file($path)) {
+                        return $toUrl($directory['url'], $name);
+                    }
                 }
             }
         }
@@ -43,7 +56,7 @@
 
     $logoUrl = $assetImageUrl(
         ['logo.png', 'logo.webp', 'logo.jpg', 'logo.jpeg', 'dmg-logo.png', 'pkd-logo.png', 'brand-logo.png', 'dmh-logo.png'],
-        ['*logo*.png', '*logo*.webp', '*logo*.jpg', '*logo*.jpeg', '*Logo*.png', '*Logo*.webp', '*dmg*.png', '*DMG*.png']
+        ['*logo*.png', '*logo*.webp', '*logo*.jpg', '*logo*.jpeg', '*Logo*.png', '*Logo*.webp', '*LOGO*.png', '*dmg*.png', '*DMG*.png']
     );
 
     $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
