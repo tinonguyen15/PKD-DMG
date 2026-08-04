@@ -14,7 +14,7 @@ Web PHP nội bộ cho Team PKD Đắng Mà Ghiền: đăng nhập nhân viên, 
 Nếu đã có DB từ bản trước, chạy migration bổ sung:
 
 ```powershell
-& 'C:\xampp\mysql\bin\mysql.exe' --default-character-set=utf8mb4 -u root -e "source C:/Code/PKD-DMG/database/2026_08_04_order_form_update.sql; source C:/Code/PKD-DMG/database/2026_08_04_user_preferences.sql; source C:/Code/PKD-DMG/database/2026_08_04_notice_templates.sql; source C:/Code/PKD-DMG/database/2026_08_04_notice_conditions.sql; source C:/Code/PKD-DMG/database/2026_08_04_remove_copy_master_switches.sql; source C:/Code/PKD-DMG/database/2026_08_04_order_quick_settings.sql; source C:/Code/PKD-DMG/database/2026_08_04_order_drafts.sql;"
+& 'C:\xampp\mysql\bin\mysql.exe' --default-character-set=utf8mb4 -u root -e "USE pkd_dmg; source C:/Code/PKD-DMG/database/2026_08_04_order_form_update.sql; source C:/Code/PKD-DMG/database/2026_08_04_user_preferences.sql; source C:/Code/PKD-DMG/database/2026_08_04_notice_templates.sql; source C:/Code/PKD-DMG/database/2026_08_04_notice_conditions.sql; source C:/Code/PKD-DMG/database/2026_08_04_remove_copy_master_switches.sql; source C:/Code/PKD-DMG/database/2026_08_04_order_quick_settings.sql; source C:/Code/PKD-DMG/database/2026_08_04_order_drafts.sql; source C:/Code/PKD-DMG/database/2026_08_04_estimated_guest_count.sql;"
 ```
 
 3. Kiểm tra `config/database.php`. Mặc định đang dùng:
@@ -57,4 +57,5 @@ Sau khi đưa lên thật, đăng nhập admin và đổi mật khẩu ngay tron
 - `Đặt bàn` lưu số lượng khách, thời gian, chi nhánh và ghi chú đặt bàn; không bắt buộc chọn món.
 - Staff chỉ thấy đơn/báo cáo/tiếp cận của chính mình.
 - Admin xem toàn team và quản lý tài khoản, chi nhánh, món, nguồn, thanh toán, trạng thái phụ, mẫu tin nhắn.
+- Món lẩu có trường `Số khách lẩu` trong Cài đặt món ăn để báo cáo tính số khách ước tính.
 - Chưa tích hợp tự động Facebook/Zalo/Hotline; chỉ nhập chỉ số tiếp cận thủ công theo ngày + chi nhánh + kênh.

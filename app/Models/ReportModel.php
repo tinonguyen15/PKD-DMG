@@ -121,7 +121,7 @@ class ReportModel
     public static function itemSales(array $filters): array
     {
         [$where, $params] = self::orderWhere($filters);
-        $guestCase = self::estimatedGuestItemCase('oi');
+        $guestCase = self::estimatedGuestItemCase('oi', 'mi');
 
         return Database::fetchAll(
             "SELECT oi.item_name,
@@ -130,6 +130,7 @@ class ReportModel
                     COALESCE(SUM(CASE WHEN o.workflow_status = 'completed' THEN {$guestCase} ELSE 0 END), 0) AS estimated_completed_guests
              FROM order_items oi
              JOIN orders o ON o.id = oi.order_id
+             LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
              WHERE {$where} AND o.workflow_status <> 'cancelled'
              GROUP BY oi.item_name
              ORDER BY quantity DESC, completed_revenue DESC
@@ -252,7 +253,7 @@ class ReportModel
 
     private static function estimatedGuestSubquery(): string
     {
-        $guestCase = self::estimatedGuestItemCase('oi');
+        $guestCase = self::estimatedGuestItemCase('oi', 'mi');
 
         return "SELECT o2.id AS order_id,
                        CASE
@@ -261,15 +262,20 @@ class ReportModel
                        END AS estimated_guests
                 FROM orders o2
                 LEFT JOIN order_items oi ON oi.order_id = o2.id
+                LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
                 GROUP BY o2.id, o2.order_type, o2.guest_count";
     }
 
-    private static function estimatedGuestItemCase(string $itemAlias): string
+    private static function estimatedGuestItemCase(string $itemAlias, ?string $menuItemAlias = null): string
     {
         $name = "LOWER(CONCAT_WS(' ', {$itemAlias}.item_name, {$itemAlias}.branch_name, {$itemAlias}.customer_name))";
         $quantity = "COALESCE({$itemAlias}.quantity, 0)";
+        $configuredCount = $menuItemAlias !== null
+            ? "COALESCE({$menuItemAlias}.estimated_guest_count, 0)"
+            : '0';
 
         return "CASE
+                    WHEN {$configuredCount} > 0 THEN {$quantity} * {$configuredCount}
                     WHEN {$name} LIKE '%đặc biệt%' OR {$name} LIKE '%dac biet%' THEN {$quantity} * 5
                     WHEN ({$name} LIKE '%sườn chìa%' OR {$name} LIKE '%suon chia%')
                          AND ({$name} LIKE '%lớn%' OR {$name} LIKE '%lon%') THEN {$quantity} * 4
