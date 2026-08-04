@@ -7,7 +7,7 @@
 <?php endif; ?>
 
 <section class="content-grid one">
-  <form class="panel stack" method="post" action="<?= e(url('/contacts')) ?>">
+  <!-- <form class="panel stack" method="post" action="<?= e(url('/contacts')) ?>">
     <?= csrf_field() ?>
     <div class="section-head">
       <h2>Tiếp cận</h2>
@@ -57,24 +57,14 @@
       </label>
     </div>
     <button class="btn primary" type="submit">Lưu tiếp cận</button>
-  </form>
+  </form> -->
 
   <form class="panel filter-grid" method="get" action="<?= e(url('/contacts')) ?>">
     <div class="section-head wide">
-      <h2>Lọc dữ liệu</h2>
+      <h2>Lọc tiếp nhận</h2>
     </div>
     <label>Từ ngày <input type="date" name="date_from" value="<?= e($filters['date_from'] ?? today()) ?>"></label>
     <label>Đến ngày <input type="date" name="date_to" value="<?= e($filters['date_to'] ?? today()) ?>"></label>
-    <?php if (is_admin()): ?>
-      <label>Nhân viên
-        <select name="user_id">
-          <option value="">Tất cả</option>
-          <?php foreach ($users as $user): ?>
-            <option value="<?= (int) $user['id'] ?>" <?= (int) ($filters['user_id'] ?? 0) === (int) $user['id'] ? 'selected' : '' ?>><?= e($user['employee_code'] . ' - ' . $user['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-    <?php endif; ?>
     <label>Chi nhánh
       <select name="branch_id">
         <option value="">Tất cả</option>
@@ -97,37 +87,42 @@
 
 <section class="panel">
   <div class="section-head">
-    <h2>Dữ liệu tiếp cận</h2>
+    <h2>Bảng tiếp nhận</h2>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>Ngày</th>
-          <th>Nhân viên</th>
           <th>Chi nhánh</th>
           <th>Kênh</th>
           <th>Tiếp nhận</th>
           <th>Đơn hàng</th>
-          <th>Doanh số</th>
-          <th>Ghi chú</th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ($rows as $row): ?>
-          <tr>
+          <tr data-contact-row>
             <td><?= e($row['report_date']) ?></td>
-            <td><?= e($row['employee_code'] . ' - ' . $row['staff_name']) ?></td>
             <td><?= e($row['branch_name']) ?></td>
             <td><?= e($channels[$row['channel']] ?? $row['channel']) ?></td>
-            <td><?= (int) $row['received_count'] ?></td>
+            <td>
+              <input
+                class="compact"
+                type="number"
+                min="0"
+                inputmode="numeric"
+                value="<?= (int) $row['received_count'] ?>"
+                data-contact-received
+                data-contact-id="<?= (int) $row['id'] ?>"
+              >
+            </td>
             <td><?= (int) $row['order_count'] ?></td>
-            <td></td>
             <td><?= e($row['note']) ?></td>
           </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?>
-          <tr><td colspan="9" class="empty">Chưa có dữ liệu.</td></tr>
+          <tr><td colspan="5" class="empty">Chưa có dòng tiếp nhận.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>

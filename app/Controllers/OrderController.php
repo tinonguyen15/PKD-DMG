@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Models\CatalogModel;
+use App\Models\ContactModel;
 use App\Models\OrderDraftModel;
 use App\Models\OrderModel;
 use App\Models\PreferenceModel;
@@ -75,6 +76,7 @@ class OrderController extends Controller
         ];
 
         $orderId = OrderModel::create($data, $items);
+        ContactModel::touchFromOrder($data);
         OrderDraftModel::deleteForUser((int) \input('draft_id', 0), (int) \current_user()['id']);
         PreferenceModel::rememberLastOrderChoices((int) \current_user()['id'], $data);
         \flash('success', 'Đã lưu đơn mới.');
