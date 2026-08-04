@@ -58,8 +58,7 @@ class SettingsController extends Controller
             CatalogModel::saveSimple($table, $_POST);
         }
 
-        \flash('success', 'Đã lưu cài đặt.');
-        \redirect('/settings');
+        $this->savedResponse('Đã tự lưu cài đặt.');
     }
 
     public function saveSystemPreferences(): void
@@ -67,8 +66,7 @@ class SettingsController extends Controller
         Auth::requireAdmin();
 
         PreferenceModel::saveSystem($_POST);
-        \flash('success', 'Đã lưu cài đặt hệ thống.');
-        \redirect('/settings');
+        $this->savedResponse('Đã tự lưu cài đặt hệ thống.');
     }
 
     public function saveUser(): void
@@ -76,12 +74,33 @@ class SettingsController extends Controller
         Auth::requireAdmin();
 
         if (empty($_POST['id']) && empty($_POST['password'])) {
+            if ($this->wantsJson()) {
+                $this->json(['success' => false, 'message' => 'Tài khoản mới cần mật khẩu.'], 422);
+            }
+
             \flash('error', 'Tài khoản mới cần mật khẩu.');
             \redirect('/settings');
         }
 
         CatalogModel::saveUser($_POST);
-        \flash('success', 'Đã lưu tài khoản.');
+        $this->savedResponse('Đã tự lưu tài khoản.');
+    }
+
+    private function savedResponse(string $message): void
+    {
+        if ($this->wantsJson()) {
+            $this->json(['success' => true, 'message' => $message]);
+        }
+
+        \flash('success', $message);
         \redirect('/settings');
+    }
+
+    private function wantsJson(): bool
+    {
+        $requestedWith = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+
+        return $requestedWith === 'xmlhttprequest' || str_contains($accept, 'application/json');
     }
 }
