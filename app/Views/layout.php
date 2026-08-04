@@ -18,7 +18,7 @@
         <a href="<?= e(url('/')) ?>">Tổng quan</a>
         <a href="<?= e(url('/orders/create')) ?>">Tạo đơn</a>
         <a href="<?= e(url('/orders')) ?>">Đơn hàng</a>
-        <a href="<?= e(url('/contacts')) ?>">Tiếp cận</a>
+        <a href="<?= e(url('/contacts')) ?>">Tiếp nhận</a>
         <a href="<?= e(url('/reports')) ?>">Báo cáo</a>
         <a href="<?= e(url('/profile/settings')) ?>">Cài đặt cá nhân</a>
         <?php if (is_admin()): ?>
