@@ -156,20 +156,21 @@ class CatalogModel
             max(0, (int) $data['price']),
             trim((string) ($data['unit'] ?? 'phần')) ?: 'phần',
             trim((string) ($data['image_path'] ?? '')),
+            max(0, (int) ($data['estimated_guest_count'] ?? 0)),
             !empty($data['active']) ? 1 : 0,
             (int) ($data['sort_order'] ?? 0),
         ];
 
         if (!empty($data['id'])) {
             Database::execute(
-                'UPDATE menu_items SET category_id = ?, slug = ?, name = ?, branch_name = ?, customer_name = ?, price = ?, unit = ?, image_path = ?, active = ?, sort_order = ? WHERE id = ?',
+                'UPDATE menu_items SET category_id = ?, slug = ?, name = ?, branch_name = ?, customer_name = ?, price = ?, unit = ?, image_path = ?, estimated_guest_count = ?, active = ?, sort_order = ? WHERE id = ?',
                 [...$params, (int) $data['id']]
             );
             return;
         }
 
         Database::execute(
-            'INSERT INTO menu_items (category_id, slug, name, branch_name, customer_name, price, unit, image_path, active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO menu_items (category_id, slug, name, branch_name, customer_name, price, unit, image_path, estimated_guest_count, active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             $params
         );
     }
