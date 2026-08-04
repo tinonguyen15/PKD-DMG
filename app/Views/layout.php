@@ -50,7 +50,7 @@
   <div id="toast-root" class="toast-root"></div>
   <script src="<?= e(url('/assets/js/app.js')) ?>"></script>
   <?php if (($title ?? '') === 'Cài đặt'): ?>
-    <script src="<?= e(url('/assets/js/settings-autosave.js?v=20260804-3')) ?>"></script>
+    <script src="<?= e(url('/assets/js/settings-autosave.js?v=20260804-4')) ?>"></script>
   <?php endif; ?>
 </body>
 </html>
