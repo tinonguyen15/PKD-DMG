@@ -40,6 +40,23 @@ class CatalogModel
         );
     }
 
+    public static function menuItem(int|string|null $id = null): ?array
+    {
+        $id = (int) $id;
+        if ($id <= 0) {
+            return null;
+        }
+
+        return Database::fetch(
+            "SELECT mi.*, mc.name AS category_name, mc.slug AS category_slug
+             FROM menu_items mi
+             LEFT JOIN menu_categories mc ON mc.id = mi.category_id
+             WHERE mi.id = ?
+             LIMIT 1",
+            [$id]
+        ) ?: null;
+    }
+
     public static function orderSources(bool $activeOnly = true): array
     {
         $where = $activeOnly ? 'WHERE active = 1' : '';
