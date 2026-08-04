@@ -1,5 +1,19 @@
-ALTER TABLE menu_items
-  ADD COLUMN estimated_guest_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER image_path;
+SET @column_exists := (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'menu_items'
+    AND COLUMN_NAME = 'estimated_guest_count'
+);
+
+SET @sql := IF(
+  @column_exists = 0,
+  'ALTER TABLE menu_items ADD COLUMN estimated_guest_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER image_path',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 UPDATE menu_items
 SET estimated_guest_count = CASE slug
