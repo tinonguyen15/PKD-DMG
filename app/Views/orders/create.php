@@ -70,6 +70,8 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
   data-order-create
   data-draft-save-url="<?= e(url('/orders/drafts')) ?>"
   data-drafts-url="<?= e(url('/orders/drafts')) ?>"
+  data-customer-lookup-url="<?= e(url('/orders/customer-lookup')) ?>"
+  data-customer-blacklist-url="<?= e(url('/orders/customer-blacklist')) ?>"
   data-draft-storage-key="pkd_order_drafts_<?= (int) current_user()['id'] ?>"
 >
   <?= csrf_field() ?>
@@ -134,7 +136,7 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
         <input name="customer_name" value="<?= e($old['customer_name'] ?? '') ?>" required>
       </label>
       <label>Số điện thoại
-        <input name="phone" value="<?= e($old['phone'] ?? '') ?>" required>
+        <input name="phone" value="<?= e($old['phone'] ?? '') ?>" data-customer-phone autocomplete="tel" required>
       </label>
       <label>Chi nhánh
         <select name="branch_id" data-branch-select required>
@@ -164,6 +166,25 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
       <label class="wide" data-booking-note-field>Ghi chú đặt bàn
         <input name="note" value="<?= e($old['note'] ?? '') ?>" placeholder="Ví dụ: Phòng lạnh">
       </label>
+    </div>
+
+    <div class="customer-insight" data-customer-insight hidden>
+      <div class="customer-insight__head">
+        <div>
+          <span data-customer-status>Đang tra cứu</span>
+          <strong data-customer-title>Lịch sử khách hàng</strong>
+        </div>
+        <button class="btn ghost small-btn" type="button" data-customer-fill hidden>Dùng thông tin cũ</button>
+      </div>
+      <div class="customer-warning" data-customer-warning hidden></div>
+      <div class="customer-metrics" data-customer-metrics></div>
+      <div class="customer-last" data-customer-last></div>
+      <div class="customer-orders" data-customer-orders></div>
+      <div class="customer-blacklist-actions">
+        <input data-customer-blacklist-reason placeholder="Lý do blacklist, ví dụ: boom hàng nhiều lần">
+        <button class="btn danger" type="button" data-customer-blacklist-add>Thêm blacklist</button>
+        <button class="btn ghost" type="button" data-customer-blacklist-remove hidden>Gỡ blacklist</button>
+      </div>
     </div>
   </section>
 
