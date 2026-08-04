@@ -1,6 +1,6 @@
 :root {
-  --login-bg: #f4f7f3;
-  --login-card: rgba(255, 255, 255, .96);
+  --login-bg: #ffffff;
+  --login-card: rgba(255, 255, 255, .98);
   --login-ink: #102018;
   --login-muted: #637067;
   --login-line: rgba(16, 32, 24, .10);
@@ -12,10 +12,7 @@
 .login-auth-body {
   min-height: 100vh;
   display: block;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(22, 133, 91, .16), transparent 30%),
-    radial-gradient(circle at 82% 74%, rgba(20, 184, 166, .10), transparent 34%),
-    linear-gradient(90deg, #eef7f1 0%, #eef7f1 50%, #fbfcfb 50%, #fbfcfb 100%);
+  background: #fff;
   color: var(--login-ink);
 }
 
@@ -25,6 +22,7 @@
   display: grid;
   place-items: center;
   padding: clamp(18px, 4vw, 46px);
+  background: #fff;
 }
 
 .login-stage {
@@ -35,9 +33,8 @@
   overflow: hidden;
   border: 1px solid rgba(16, 32, 24, .08);
   border-radius: 34px;
-  background: rgba(255, 255, 255, .68);
-  box-shadow: 0 36px 90px rgba(18, 42, 29, .14);
-  backdrop-filter: blur(16px);
+  background: #fff;
+  box-shadow: 0 32px 82px rgba(15, 23, 42, .10);
 }
 
 .login-visual,
@@ -51,12 +48,12 @@
 
 .login-visual {
   background:
-    radial-gradient(circle at 14% 18%, rgba(22, 133, 91, .18), transparent 33%),
-    linear-gradient(145deg, rgba(247,252,248,.92), rgba(235,246,240,.70));
+    radial-gradient(circle at 15% 14%, rgba(22, 133, 91, .12), transparent 34%),
+    linear-gradient(145deg, #fbfdfb 0%, #f4faf6 100%);
 }
 
 .login-panel {
-  background: rgba(255, 255, 255, .84);
+  background: #fff;
   border-left: 1px solid rgba(16, 32, 24, .06);
 }
 
@@ -110,7 +107,7 @@
   font-size: 14px;
   font-weight: 900;
   letter-spacing: .04em;
-  box-shadow: 0 15px 28px rgba(22, 133, 91, .18);
+  box-shadow: 0 15px 28px rgba(22, 133, 91, .16);
   overflow: hidden;
 }
 
@@ -150,8 +147,8 @@
   border: 1px solid rgba(16, 32, 24, .08);
   border-radius: 26px;
   background:
-    radial-gradient(circle at 18% 20%, rgba(22, 133, 91, .14), transparent 34%),
-    linear-gradient(145deg, rgba(255,255,255,.92), rgba(239,247,242,.76));
+    radial-gradient(circle at 18% 20%, rgba(22, 133, 91, .10), transparent 34%),
+    linear-gradient(145deg, #fff 0%, #f6faf7 100%);
   overflow: hidden;
 }
 
@@ -221,7 +218,7 @@
   padding: 11px 13px;
   border: 1px solid rgba(16, 32, 24, .08);
   border-radius: 16px;
-  background: rgba(255, 255, 255, .76);
+  background: rgba(255, 255, 255, .86);
 }
 
 .login-feature-grid strong {
