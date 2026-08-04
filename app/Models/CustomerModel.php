@@ -193,7 +193,7 @@ class CustomerModel
     private static function recentOrdersByPhone(array $variants): array
     {
         [$where, $params] = self::orderPhoneWhere($variants);
-        return Database::fetchAll(
+        $orders = Database::fetchAll(
             "SELECT o.id, o.order_code, o.customer_name, o.phone, o.order_type, o.workflow_status,
                     o.total, o.address, o.receive_time, o.created_at,
                     b.name AS branch_name, s.name AS source_name
@@ -205,6 +205,42 @@ class CustomerModel
              LIMIT 6",
             $params
         );
+
+        if (!$orders) {
+            return [];
+        }
+
+        $itemsByOrder = self::itemsByOrderIds(array_map('intval', array_column($orders, 'id')));
+        foreach ($orders as &$order) {
+            $order['items'] = $itemsByOrder[(int) $order['id']] ?? [];
+        }
+        unset($order);
+
+        return $orders;
+    }
+
+    private static function itemsByOrderIds(array $orderIds): array
+    {
+        $orderIds = array_values(array_unique(array_filter(array_map('intval', $orderIds))));
+        if (!$orderIds) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+        $rows = Database::fetchAll(
+            "SELECT order_id, menu_item_id, item_name, branch_name, customer_name, item_note, price, quantity, line_total
+             FROM order_items
+             WHERE order_id IN ({$placeholders})
+             ORDER BY id ASC",
+            $orderIds
+        );
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $grouped[(int) $row['order_id']][] = $row;
+        }
+
+        return $grouped;
     }
 
     private static function orderPhoneWhere(array $variants): array
@@ -295,6 +331,21 @@ class CustomerModel
             'branch_name' => (string) ($order['branch_name'] ?? ''),
             'source_name' => (string) ($order['source_name'] ?? ''),
             'created_at' => $order['created_at'] ?? null,
+            'items' => array_map([self::class, 'presentOrderItem'], (array) ($order['items'] ?? [])),
+        ];
+    }
+
+    private static function presentOrderItem(array $item): array
+    {
+        return [
+            'menu_item_id' => (int) ($item['menu_item_id'] ?? 0),
+            'item_name' => (string) ($item['item_name'] ?? ''),
+            'branch_name' => (string) ($item['branch_name'] ?? ''),
+            'customer_name' => (string) ($item['customer_name'] ?? ''),
+            'item_note' => (string) ($item['item_note'] ?? ''),
+            'price' => (int) ($item['price'] ?? 0),
+            'quantity' => (int) ($item['quantity'] ?? 0),
+            'line_total' => (int) ($item['line_total'] ?? 0),
         ];
     }
 
