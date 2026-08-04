@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Models\CatalogModel;
 use App\Models\ContactModel;
+use App\Models\CustomerModel;
 use App\Models\OrderDraftModel;
 use App\Models\OrderModel;
 use App\Models\PreferenceModel;
@@ -76,6 +77,7 @@ class OrderController extends Controller
         ];
 
         $orderId = OrderModel::create($data, $items);
+        CustomerModel::touchFromOrder($data, $orderId);
         ContactModel::touchFromOrder($data);
         OrderDraftModel::deleteForUser((int) \input('draft_id', 0), (int) \current_user()['id']);
         PreferenceModel::rememberLastOrderChoices((int) \current_user()['id'], $data);
@@ -135,6 +137,31 @@ class OrderController extends Controller
         OrderModel::updateStatus($id, $status);
         \flash('success', 'Đã cập nhật trạng thái đơn.');
         \redirect((string) ($_SERVER['HTTP_REFERER'] ?? '/orders'));
+    }
+
+    public function customerLookup(): void
+    {
+        $phone = trim((string) \input('phone', ''));
+        try {
+            $this->json(CustomerModel::lookup($phone));
+        } catch (\Throwable $exception) {
+            $this->json(['message' => 'Không tra cứu được lịch sử khách hàng.'], 500);
+        }
+    }
+
+    public function customerBlacklist(): void
+    {
+        $phone = trim((string) \input('phone', ''));
+        $blacklisted = (int) \input('is_blacklisted', 1) === 1;
+        $reason = trim((string) \input('reason', ''));
+
+        try {
+            $this->json(CustomerModel::setBlacklist($phone, $blacklisted, $reason));
+        } catch (\InvalidArgumentException $exception) {
+            $this->json(['message' => $exception->getMessage()], 422);
+        } catch (\Throwable $exception) {
+            $this->json(['message' => 'Không cập nhật được blacklist. Hãy kiểm tra đã import migration customers chưa.'], 500);
+        }
     }
 
     public function markSentAfterCopy(int $id): void
@@ -259,30 +286,28 @@ class OrderController extends Controller
         unset($item);
 
         usort($items, static function (array $a, array $b) use ($favoriteRank, $recentRank): int {
-            $aId = (int) ($a['id'] ?? 0);
-            $bId = (int) ($b['id'] ?? 0);
-            $aBucket = isset($favoriteRank[$aId]) ? 0 : (isset($recentRank[$aId]) ? 1 : 2);
-            $bBucket = isset($favoriteRank[$bId]) ? 0 : (isset($recentRank[$bId]) ? 1 : 2);
-
-            if ($aBucket !== $bBucket) {
-                return $aBucket <=> $bBucket;
+            $aId = (int) $a['id'];
+            $bId = (int) $b['id'];
+            $aFavorite = array_key_exists($aId, $favoriteRank);
+            $bFavorite = array_key_exists($bId, $favoriteRank);
+            if ($aFavorite !== $bFavorite) {
+                return $aFavorite ? -1 : 1;
             }
-
-            if ($aBucket === 0 && $favoriteRank[$aId] !== $favoriteRank[$bId]) {
+            if ($aFavorite && $bFavorite) {
                 return $favoriteRank[$aId] <=> $favoriteRank[$bId];
             }
 
-            if ($aBucket === 1 && $recentRank[$aId] !== $recentRank[$bId]) {
+            $aRecent = array_key_exists($aId, $recentRank);
+            $bRecent = array_key_exists($bId, $recentRank);
+            if ($aRecent !== $bRecent) {
+                return $aRecent ? -1 : 1;
+            }
+            if ($aRecent && $bRecent) {
                 return $recentRank[$aId] <=> $recentRank[$bId];
             }
 
             return ((int) ($a['_original_index'] ?? 0)) <=> ((int) ($b['_original_index'] ?? 0));
         });
-
-        foreach ($items as &$item) {
-            unset($item['_original_index']);
-        }
-        unset($item);
 
         return $items;
     }
