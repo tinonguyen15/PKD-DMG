@@ -52,5 +52,8 @@
   <?php if (($title ?? '') === 'Cài đặt'): ?>
     <script src="<?= e(url('/assets/js/settings-autosave.js?v=20260804-4')) ?>"></script>
   <?php endif; ?>
+  <?php if (($title ?? '') === 'Tiếp nhận'): ?>
+    <script src="<?= e(url('/assets/js/contacts.js?v=20260804-1')) ?>"></script>
+  <?php endif; ?>
 </body>
 </html>
