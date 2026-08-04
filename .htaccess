@@ -1,0 +1,17 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Không cho truy cập trực tiếp mã nguồn/cấu hình khi deploy cả repo vào public_html.
+  RewriteRule ^(?:app|config|database|vendor|storage)(?:/|$) - [F,L,NC]
+  RewriteRule ^(?:\.env|\.git|composer\.(?:json|lock)|README\.md|README)$ - [F,L,NC]
+
+  # Assets thật nằm trong public/assets nhưng URL app dùng /assets/...
+  RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+
+  # Đưa mọi route của app về front controller.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.php [L]
+</IfModule>
