@@ -18,7 +18,7 @@
         <a href="<?= e(url('/')) ?>">Tổng quan</a>
         <a href="<?= e(url('/orders/create')) ?>">Tạo đơn</a>
         <a href="<?= e(url('/orders')) ?>">Đơn hàng</a>
-        <a href="<?= e(url('/contacts')) ?>">Tiếp nhận</a>
+        <a href="<?= e(url('/contacts')) ?>">Tiếp cận</a>
         <a href="<?= e(url('/reports')) ?>">Báo cáo</a>
         <a href="<?= e(url('/profile/settings')) ?>">Cài đặt cá nhân</a>
         <?php if (is_admin()): ?>
@@ -53,7 +53,7 @@
     <script src="<?= e(url('/assets/js/settings-autosave.js?v=20260804-4')) ?>"></script>
   <?php endif; ?>
   <?php if (($title ?? '') === 'Tiếp nhận'): ?>
-    <script src="<?= e(url('/assets/js/contacts.js?v=20260804-1')) ?>"></script>
+    <script src="<?= e(url('/assets/js/contacts.js?v=20260804-2')) ?>"></script>
   <?php endif; ?>
 </body>
 </html>
