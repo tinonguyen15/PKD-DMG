@@ -1,4 +1,14 @@
-<?php $old = $old ?: []; ?>
+<?php
+$old = $old ?: [];
+$formatDate = static function (mixed $value): string {
+    $timestamp = strtotime((string) $value);
+    return $timestamp ? date('d/m/Y', $timestamp) : '';
+};
+$addDate = (string) ($old['report_date'] ?? $filters['date_from'] ?? today());
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $addDate)) {
+    $addDate = today();
+}
+?>
 
 <?php if ($errors): ?>
   <div class="alert danger">
@@ -6,60 +16,44 @@
   </div>
 <?php endif; ?>
 
-<section class="content-grid one">
-  <!-- <form class="panel stack" method="post" action="<?= e(url('/contacts')) ?>">
-    <?= csrf_field() ?>
-    <div class="section-head">
-      <h2>Tiếp cận</h2>
+<section
+  class="panel"
+  data-contacts-page
+  data-contact-save-url="<?= e(url('/contacts')) ?>"
+  data-contact-csrf="<?= e(\App\Core\Csrf::token()) ?>"
+>
+  <div class="section-head">
+    <div>
+      <h2>Thêm dòng tiếp nhận</h2>
+      <p class="muted">Dùng cho lượt tiếp nhận chưa tạo đơn. Dòng mới lấy ngày đang lọc: <?= e($formatDate($addDate)) ?>.</p>
     </div>
-    <div class="form-grid">
-      <label>Ngày
-        <input type="date" name="report_date" value="<?= e($old['report_date'] ?? today()) ?>" required>
-      </label>
-      <?php if (is_admin()): ?>
-        <label>Nhân viên
-          <select name="user_id" required>
-            <?php foreach ($users as $user): ?>
-              <option value="<?= (int) $user['id'] ?>" <?= (int) ($old['user_id'] ?? current_user()['id']) === (int) $user['id'] ? 'selected' : '' ?>><?= e($user['employee_code'] . ' - ' . $user['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
-      <?php endif; ?>
-      <label>Chi nhánh
-        <select name="branch_id" required>
-          <option value="">Chọn CN</option>
-          <?php foreach ($branches as $branch): ?>
-            <option value="<?= (int) $branch['id'] ?>" <?= (int) ($old['branch_id'] ?? 0) === (int) $branch['id'] ? 'selected' : '' ?>><?= e($branch['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <label>Kênh
-        <select name="channel" required>
-          <?php foreach ($channels as $key => $label): ?>
-            <option value="<?= e($key) ?>" <?= ($old['channel'] ?? '') === $key ? 'selected' : '' ?>><?= e($label) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <label>Tiếp nhận
-        <input type="number" min="0" name="received_count" value="<?= e($old['received_count'] ?? 0) ?>">
-      </label>
-      <label>Đủ điều kiện
-        <input type="number" min="0" name="qualified_count" value="<?= e($old['qualified_count'] ?? 0) ?>">
-      </label>
-      <label>Chốt đơn
-        <input type="number" min="0" name="order_count" value="<?= e($old['order_count'] ?? 0) ?>">
-      </label>
-      <label>Hủy/Không chốt
-        <input type="number" min="0" name="cancelled_count" value="<?= e($old['cancelled_count'] ?? 0) ?>">
-      </label>
-      <label class="wide">Ghi chú
-        <input name="note" value="<?= e($old['note'] ?? '') ?>">
-      </label>
-    </div>
-    <button class="btn primary" type="submit">Lưu tiếp cận</button>
-  </form> -->
+  </div>
 
-  <form class="panel filter-grid" method="get" action="<?= e(url('/contacts')) ?>">
+  <form class="filter-grid" method="post" action="<?= e(url('/contacts')) ?>">
+    <?= csrf_field() ?>
+    <input type="hidden" name="action" value="add_row">
+    <input type="hidden" name="report_date" value="<?= e($addDate) ?>">
+    <label>Chi nhánh
+      <select name="branch_id" required>
+        <option value="">Chọn chi nhánh</option>
+        <?php foreach ($branches as $branch): ?>
+          <option value="<?= (int) $branch['id'] ?>" <?= (int) ($old['branch_id'] ?? 0) === (int) $branch['id'] ? 'selected' : '' ?>><?= e($branch['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <label>Kênh
+      <select name="channel" required>
+        <?php foreach ($channels as $key => $label): ?>
+          <option value="<?= e($key) ?>" <?= ($old['channel'] ?? 'zalo_branch') === $key ? 'selected' : '' ?>><?= e($label) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <button class="btn primary" type="submit">Thêm dòng</button>
+  </form>
+</section>
+
+<section class="panel">
+  <form class="filter-grid" method="get" action="<?= e(url('/contacts')) ?>">
     <div class="section-head wide">
       <h2>Lọc tiếp nhận</h2>
     </div>
@@ -98,12 +92,14 @@
           <th>Kênh</th>
           <th>Tiếp nhận</th>
           <th>Đơn hàng</th>
+          <th>Doanh thu</th>
+          <th>TB doanh thu/đơn</th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ($rows as $row): ?>
           <tr data-contact-row>
-            <td><?= e($row['report_date']) ?></td>
+            <td><?= e($formatDate($row['report_date'])) ?></td>
             <td><?= e($row['branch_name']) ?></td>
             <td><?= e($channels[$row['channel']] ?? $row['channel']) ?></td>
             <td>
@@ -114,15 +110,18 @@
                 inputmode="numeric"
                 value="<?= (int) $row['received_count'] ?>"
                 data-contact-received
-                data-contact-id="<?= (int) $row['id'] ?>"
+                data-contact-report-date="<?= e($row['report_date']) ?>"
+                data-contact-branch-id="<?= (int) $row['branch_id'] ?>"
+                data-contact-channel="<?= e($row['channel']) ?>"
               >
             </td>
-            <td><?= (int) $row['order_count'] ?></td>
-            <td><?= e($row['note']) ?></td>
+            <td><?= (int) ($row['order_count'] ?? 0) ?></td>
+            <td><?= money((int) ($row['revenue'] ?? 0)) ?></td>
+            <td><?= money((int) ($row['average_revenue_per_order'] ?? 0)) ?></td>
           </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?>
-          <tr><td colspan="5" class="empty">Chưa có dòng tiếp nhận.</td></tr>
+          <tr><td colspan="7" class="empty">Chưa có dòng tiếp nhận.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
