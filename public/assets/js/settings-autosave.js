@@ -1,6 +1,6 @@
 (function () {
-  const pagePath = window.location.pathname.replace(/\/+$/, '') || '/';
-  if (pagePath !== '/settings') return;
+  const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (!currentPath.endsWith('/settings') && currentPath !== '/settings') return;
 
   const SAVE_DELAY = 700;
   const forms = Array.from(document.querySelectorAll('form[method="post"]'));
@@ -15,18 +15,29 @@
     setTimeout(() => node.remove(), 2200);
   }
 
+  function normalizedPath(value) {
+    return new URL(value || window.location.href, window.location.href).pathname.replace(/\/+$/, '') || '/';
+  }
+
   function actionPath(form) {
-    return new URL(form.getAttribute('action') || window.location.href, window.location.href).pathname.replace(/\/+$/, '') || '/';
+    return normalizedPath(form.getAttribute('action') || window.location.href);
+  }
+
+  function isSettingsAction(path, suffix) {
+    return path === suffix || path.endsWith(suffix);
   }
 
   function isAutosaveForm(form) {
     const path = actionPath(form);
-    const isSettingsAction = ['/settings/catalog', '/settings/users', '/settings/system-preferences'].includes(path);
-    if (!isSettingsAction) return false;
+    const isCatalog = isSettingsAction(path, '/settings/catalog');
+    const isUsers = isSettingsAction(path, '/settings/users');
+    const isSystemPreferences = isSettingsAction(path, '/settings/system-preferences');
+
+    if (!isCatalog && !isUsers && !isSystemPreferences) return false;
 
     const hasExistingId = Boolean(form.querySelector('input[name="id"]'));
-    const isSystemPreferences = path === '/settings/system-preferences';
 
+    // Form thêm mới vẫn cần bấm nút Thêm để tránh tạo dữ liệu rác khi đang nhập dở.
     return hasExistingId || isSystemPreferences;
   }
 
