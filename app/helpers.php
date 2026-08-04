@@ -23,6 +23,10 @@ function e(mixed $value): string
 
 function url(string $path = ''): string
 {
+    if (preg_match('#^https?://#i', $path) === 1) {
+        return $path;
+    }
+
     $base = rtrim((string) config('app.base_url', ''), '/');
     $path = '/' . ltrim($path, '/');
 
@@ -31,8 +35,25 @@ function url(string $path = ''): string
 
 function redirect(string $path): never
 {
-    header('Location: ' . url($path));
+    header('Location: ' . safe_redirect_url($path));
     exit;
+}
+
+function safe_redirect_url(string $path): string
+{
+    if (preg_match('#^https?://#i', $path) !== 1) {
+        return url($path);
+    }
+
+    $targetHost = parse_url($path, PHP_URL_HOST);
+    $appHost = parse_url((string) config('app.base_url', ''), PHP_URL_HOST);
+    $requestHost = $_SERVER['HTTP_HOST'] ?? '';
+
+    if ($targetHost && ($targetHost === $appHost || $targetHost === $requestHost)) {
+        return $path;
+    }
+
+    return url('/');
 }
 
 function request_method(): string
