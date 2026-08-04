@@ -166,13 +166,14 @@ $renderSimpleCatalog = function (string $title, string $catalog, array $rows): v
     <input type="number" name="price" placeholder="Giá" min="0" required>
     <input name="unit" placeholder="Đơn vị" value="phần">
     <input name="image_path" placeholder="/assets/images/menu/...">
+    <input type="number" name="estimated_guest_count" placeholder="Số khách lẩu" min="0" value="0" title="0 nếu không phải lẩu">
     <input type="number" name="sort_order" placeholder="Thứ tự" value="0">
     <label class="check"><input type="checkbox" name="active" value="1" checked> Bật</label>
     <button class="btn primary" type="submit">Thêm món</button>
   </form>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Loại</th><th>Slug</th><th>Tên</th><th>Gửi CN</th><th>Giá</th><th>Đơn vị</th><th>Thứ tự</th><th>Bật</th><th>Lưu</th></tr></thead>
+      <thead><tr><th>Loại</th><th>Slug</th><th>Tên</th><th>Gửi CN</th><th>Giá</th><th>Đơn vị</th><th>Số khách</th><th>Thứ tự</th><th>Bật</th><th>Lưu</th></tr></thead>
       <tbody>
         <?php foreach ($items as $row): ?>
           <tr>
@@ -194,6 +195,7 @@ $renderSimpleCatalog = function (string $title, string $catalog, array $rows): v
               <td><input name="branch_name" value="<?= e($row['branch_name']) ?>"></td>
               <td><input type="number" name="price" value="<?= (int) $row['price'] ?>" min="0"></td>
               <td><input name="unit" value="<?= e($row['unit']) ?>"></td>
+              <td><input type="number" name="estimated_guest_count" value="<?= (int) ($row['estimated_guest_count'] ?? 0) ?>" min="0" title="0 nếu không phải lẩu"></td>
               <td><input type="number" name="sort_order" value="<?= (int) $row['sort_order'] ?>"></td>
               <td><input type="checkbox" name="active" value="1" <?= (int) $row['active'] === 1 ? 'checked' : '' ?>></td>
               <td><button class="btn ghost" type="submit">Lưu</button></td>
