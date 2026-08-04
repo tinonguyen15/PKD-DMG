@@ -28,9 +28,9 @@ class ContactController extends Controller
             'users' => CatalogModel::users(true),
             'channels' => ContactModel::CHANNELS,
             'old' => \flash('old') ?: [
-                'report_date' => \today(),
+                'report_date' => $filters['date_from'] ?: \today(),
                 'branch_id' => $preferences['default_contact_branch_id'] ?? 0,
-                'channel' => $preferences['default_contact_channel'] ?? 'zalo_oa',
+                'channel' => $preferences['default_contact_channel'] ?? 'zalo_branch',
             ],
             'errors' => \flash('errors') ?: [],
         ]);
@@ -38,48 +38,54 @@ class ContactController extends Controller
 
     public function store(): void
     {
-        if ((int) \input('id', 0) > 0) {
-            ContactModel::saveReceivedCount(
-                (int) \input('id'),
-                (int) \input('received_count', 0)
-            );
-            $this->savedResponse('Đã tự lưu tiếp nhận.');
-        }
+        $action = (string) \input('action', 'add_row');
 
         $data = [
             'report_date' => (string) \input('report_date', \today()),
             'user_id' => (int) \current_user()['id'],
             'branch_id' => (int) \input('branch_id'),
             'channel' => (string) \input('channel', ''),
+            'received_count' => (int) \input('received_count', 0),
         ];
 
-        $errors = [];
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['report_date'])) {
-            $errors[] = 'Ngày tiếp nhận không hợp lệ.';
-        }
-        if ($data['branch_id'] <= 0) {
-            $errors[] = 'Vui lòng chọn chi nhánh.';
-        }
-        if (!isset(ContactModel::CHANNELS[$data['channel']])) {
-            $errors[] = 'Kênh tiếp nhận không hợp lệ.';
-        }
-
+        $errors = $this->validateScope($data);
         if ($errors) {
             $this->errorResponse($errors, $_POST);
         }
 
+        if ($action === 'save_received') {
+            ContactModel::saveReceivedByScope($data);
+            $this->savedResponse('Đã tự lưu tiếp nhận.', $data['report_date']);
+        }
+
         ContactModel::ensureRow($data);
-        $this->savedResponse('Đã thêm dòng tiếp nhận.');
+        $this->savedResponse('Đã thêm dòng tiếp nhận.', $data['report_date']);
     }
 
-    private function savedResponse(string $message): void
+    private function validateScope(array $data): array
+    {
+        $errors = [];
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $data['report_date'])) {
+            $errors[] = 'Ngày tiếp nhận không hợp lệ.';
+        }
+        if ((int) $data['branch_id'] <= 0) {
+            $errors[] = 'Vui lòng chọn chi nhánh.';
+        }
+        if (!isset(ContactModel::CHANNELS[(string) $data['channel']])) {
+            $errors[] = 'Kênh tiếp nhận không hợp lệ.';
+        }
+
+        return $errors;
+    }
+
+    private function savedResponse(string $message, string $reportDate): void
     {
         if ($this->wantsJson()) {
             $this->json(['success' => true, 'message' => $message]);
         }
 
         \flash('success', $message);
-        \redirect('/contacts?date_from=' . urlencode((string) \input('report_date', \today())) . '&date_to=' . urlencode((string) \input('report_date', \today())));
+        \redirect('/contacts?date_from=' . urlencode($reportDate) . '&date_to=' . urlencode($reportDate));
     }
 
     private function errorResponse(array $errors, array $old): void
