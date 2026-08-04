@@ -54,6 +54,8 @@ $selectedPaymentCandidate = (int) ($old['payment_method_id'] ?? $defaultPaymentI
 $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?: $defaultPaymentId($selectedType);
 ?>
 
+<link rel="stylesheet" href="<?= e(url('/assets/css/customer-insights.css?v=20260805-1')) ?>">
+
 <?php if ($errors): ?>
   <div class="alert danger">
     <?php foreach ($errors as $message): ?><div><?= e($message) ?></div><?php endforeach; ?>
@@ -253,3 +255,4 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
     </div>
   </aside>
 </form>
+<script src="<?= e(url('/assets/js/customer-insights.js?v=20260805-1')) ?>"></script>
