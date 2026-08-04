@@ -3,7 +3,7 @@
   if (!currentPath.endsWith('/settings') && currentPath !== '/settings') return;
 
   const SAVE_DELAY = 700;
-  const forms = Array.from(document.querySelectorAll('form[method="post"]'));
+  const timers = new WeakMap();
 
   function toast(message) {
     const root = document.querySelector('#toast-root');
@@ -27,7 +27,13 @@
     return path === suffix || path.endsWith(suffix);
   }
 
+  function controlsOf(form) {
+    return Array.from(form.elements || []).filter((control) => control instanceof HTMLElement);
+  }
+
   function isAutosaveForm(form) {
+    if (!(form instanceof HTMLFormElement)) return false;
+
     const path = actionPath(form);
     const isCatalog = isSettingsAction(path, '/settings/catalog');
     const isUsers = isSettingsAction(path, '/settings/users');
@@ -35,10 +41,17 @@
 
     if (!isCatalog && !isUsers && !isSystemPreferences) return false;
 
-    const hasExistingId = Boolean(form.querySelector('input[name="id"]'));
+    const controls = controlsOf(form);
+    const hasExistingId = controls.some((control) => control.getAttribute('name') === 'id');
 
     // Form thêm mới vẫn cần bấm nút Thêm để tránh tạo dữ liệu rác khi đang nhập dở.
     return hasExistingId || isSystemPreferences;
+  }
+
+  function ownerForm(target) {
+    if (!(target instanceof HTMLElement)) return null;
+    if ('form' in target && target.form instanceof HTMLFormElement) return target.form;
+    return target.closest('form');
   }
 
   function fingerprint(form) {
@@ -46,17 +59,20 @@
   }
 
   function statusNode(form) {
-    let node = form.querySelector('[data-autosave-status]');
-    if (node) return node;
+    const existing = form.querySelector('[data-autosave-status]');
+    if (existing) return existing;
 
-    node = document.createElement('small');
+    const node = document.createElement('small');
     node.dataset.autosaveStatus = 'idle';
     node.className = 'autosave-status';
     node.textContent = 'Tự lưu đang bật';
 
-    const submitButton = form.querySelector('button[type="submit"]');
-    if (submitButton && submitButton.parentElement) {
-      submitButton.insertAdjacentElement('afterend', node);
+    const controls = controlsOf(form);
+    const submitButton = controls.find((control) => control.matches('button[type="submit"], input[type="submit"]'));
+    const anchor = submitButton || controls[controls.length - 1];
+
+    if (anchor && anchor.parentElement) {
+      anchor.insertAdjacentElement('afterend', node);
     } else {
       form.appendChild(node);
     }
@@ -71,6 +87,8 @@
   }
 
   async function saveForm(form, options = {}) {
+    if (!form || form.dataset.autosaveEnabled !== '1') return;
+
     if (form.dataset.autosaving === '1') {
       form.dataset.autosaveQueued = '1';
       return;
@@ -129,8 +147,7 @@
     }
   }
 
-  function shouldIgnoreAutosaveEvent(event) {
-    const target = event.target;
+  function shouldIgnoreAutosaveTarget(target) {
     if (!(target instanceof HTMLElement)) return true;
     if (!target.matches('input, select, textarea')) return true;
 
@@ -140,35 +157,60 @@
     return false;
   }
 
-  forms.forEach((form) => {
-    if (!isAutosaveForm(form)) return;
+  function scheduleSave(form, delay) {
+    if (!form || form.dataset.autosaveEnabled !== '1') return;
 
-    form.dataset.autosaveEnabled = '1';
-    form.dataset.autosaveLastSaved = fingerprint(form);
-    statusNode(form);
+    const oldTimer = timers.get(form);
+    if (oldTimer) window.clearTimeout(oldTimer);
 
-    let timer = 0;
-    const scheduleSave = (delay) => {
-      window.clearTimeout(timer);
-      setStatus(form, 'Có thay đổi, sắp tự lưu...', 'pending');
-      timer = window.setTimeout(() => saveForm(form), delay);
-    };
+    setStatus(form, 'Có thay đổi, sắp tự lưu...', 'pending');
+    const nextTimer = window.setTimeout(() => saveForm(form), delay);
+    timers.set(form, nextTimer);
+  }
 
-    form.addEventListener('input', (event) => {
-      if (shouldIgnoreAutosaveEvent(event)) return;
-      scheduleSave(SAVE_DELAY);
+  function initAutosaveForms() {
+    const forms = Array.from(document.forms || []);
+    let enabledCount = 0;
+
+    forms.forEach((form) => {
+      if (!isAutosaveForm(form)) return;
+
+      form.dataset.autosaveEnabled = '1';
+      form.dataset.autosaveLastSaved = fingerprint(form);
+      statusNode(form);
+      enabledCount += 1;
     });
 
-    form.addEventListener('change', (event) => {
-      if (shouldIgnoreAutosaveEvent(event)) return;
-      scheduleSave(120);
-    });
+    if (enabledCount > 0) {
+      console.info(`[settings-autosave] Enabled ${enabledCount} settings forms.`);
+    } else {
+      console.warn('[settings-autosave] No editable settings forms detected.');
+    }
+  }
 
-    form.addEventListener('submit', (event) => {
-      if (form.dataset.autosaveEnabled !== '1') return;
-      event.preventDefault();
-      window.clearTimeout(timer);
-      saveForm(form, { force: true });
-    });
-  });
+  document.addEventListener('input', (event) => {
+    const target = event.target;
+    if (shouldIgnoreAutosaveTarget(target)) return;
+
+    scheduleSave(ownerForm(target), SAVE_DELAY);
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const target = event.target;
+    if (shouldIgnoreAutosaveTarget(target)) return;
+
+    scheduleSave(ownerForm(target), 120);
+  }, true);
+
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.dataset.autosaveEnabled !== '1') return;
+
+    event.preventDefault();
+    const oldTimer = timers.get(form);
+    if (oldTimer) window.clearTimeout(oldTimer);
+    saveForm(form, { force: true });
+  }, true);
+
+  initAutosaveForms();
 })();
