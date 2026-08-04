@@ -1,13 +1,16 @@
 <section class="metric-grid">
-  <article class="metric-title"><span>Tổng quan</span><b><?= (int) ($summary['total_orders'] ?? 0) ?></b><small>Đơn tạo hôm nay</small></article>
+  <article class="metric-title"><span>Tổng đơn</span><b><?= (int) ($summary['total_orders'] ?? 0) ?></b><small>Đơn tạo hôm nay</small></article>
   <article><span>Đơn hoàn thành</span><b><?= (int) ($summary['completed_orders'] ?? 0) ?></b></article>
-  <article><span>Doanh thu chốt</span><b><?= money((int) ($summary['completed_revenue'] ?? 0)) ?></b></article>
+  <article><span>Đơn hủy</span><b><?= (int) ($summary['cancelled_orders'] ?? 0) ?></b></article>
+  <article><span>Doanh thu</span><b><?= money((int) ($summary['completed_revenue'] ?? 0)) ?></b></article>
   <article><span>Khách ước tính</span><b><?= (int) ($summary['estimated_completed_guests'] ?? 0) ?></b></article>
-  <article><span>TB/khách chốt</span><b><?= money((int) ($summary['average_revenue_per_guest'] ?? 0)) ?></b></article>
+  <article><span>TB DT/Đơn</span><b><?= money((int) ($summary['average_completed_order'] ?? 0)) ?></b>/ Đơn</article>
+  <article><span>TB DT/Khách</span><b><?= money((int) ($summary['average_revenue_per_guest'] ?? 0)) ?></b>/ Khách</article>
   <article><span>Lượt tiếp cận</span><b><?= (int) ($contacts['received_count'] ?? 0) ?></b></article>
+
 </section>
 
-<section class="content-grid two">
+<!-- <section class="content-grid two">
   <article class="panel">
     <div class="section-head">
       <h2>Pipeline hôm nay</h2>
@@ -45,7 +48,7 @@
       <strong><?= (int) ($contacts['manual_order_count'] ?? 0) ?></strong>
     </div>
   </article>
-</section>
+</section> -->
 
 <section class="panel">
   <div class="section-head">
@@ -57,11 +60,12 @@
       <thead>
         <tr>
           <th>Mã</th>
-          <th>Khách</th>
+          <th>Tên KH</th>
           <th>Chi nhánh</th>
           <th>Trạng thái</th>
           <th>Tổng</th>
-          <th>Khách ước tính</th>
+          <th>Khách</th>
+          <th>TB/ Khách</th>
         </tr>
       </thead>
       <tbody>
@@ -73,6 +77,7 @@
             <td><span class="pill <?= e($order['workflow_status']) ?>"><?= e($workflowLabels[$order['workflow_status']] ?? $order['workflow_status']) ?></span></td>
             <td><?= money((int) $order['total']) ?></td>
             <td><?= (int) ($order['estimated_guests'] ?? 0) ?: '-' ?></td>
+            <td><?= money((int) ($order['average_revenue_per_guest'] ?? 0)) ?></td>
           </tr>
         <?php endforeach; ?>
         <?php if (!$latestOrders): ?>
