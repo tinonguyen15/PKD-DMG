@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Models\CatalogModel;
 use App\Models\ContactModel;
+use App\Models\CustomerBlacklistModel;
 use App\Models\CustomerModel;
 use App\Models\OrderDraftModel;
 use App\Models\OrderModel;
@@ -119,12 +120,13 @@ class OrderController extends Controller
             return;
         }
         $order = ReportModel::withEstimatedGuestMetrics([$order])[0] ?? $order;
-        $customerProfile = CustomerModel::lookup((string) ($order['phone'] ?? ''));
+        $customerProfile = CustomerBlacklistModel::attachToProfile(CustomerModel::lookup((string) ($order['phone'] ?? '')));
 
         $this->view('orders/show', [
             'title' => $order['order_code'],
             'order' => $order,
             'customerProfile' => $customerProfile,
+            'orderBlacklistEntry' => CustomerBlacklistModel::orderEntry((int) $order['id']),
             'branchText' => OrderModel::generateBranchText($order, $order['items']),
             'customerText' => OrderModel::generateCustomerText($order),
             'copyPreferences' => PreferenceModel::resolved((int) \current_user()['id']),
@@ -153,16 +155,10 @@ class OrderController extends Controller
         $reason = trim((string) \input('reason', ''));
 
         try {
-            CustomerModel::setBlacklist(
-                (string) ($order['phone'] ?? ''),
-                $blacklisted,
-                $reason,
-                (int) \current_user()['id'],
-                $id
-            );
-            \flash('success', $blacklisted ? 'Đã thêm khách vào blacklist.' : 'Đã gỡ khách khỏi blacklist.');
+            CustomerBlacklistModel::setForOrder($order, $blacklisted, $reason, (int) \current_user()['id']);
+            \flash('success', $blacklisted ? 'Đã ghi nhận đơn này vào blacklist.' : 'Đã gỡ đơn này khỏi blacklist.');
         } catch (\Throwable $exception) {
-            \flash('error', 'Không cập nhật được blacklist. Hãy kiểm tra migration blacklist đã import chưa.');
+            \flash('error', 'Không cập nhật được blacklist. Hãy kiểm tra migration blacklist_entries đã import chưa.');
         }
 
         \redirect('/orders/' . $id);
@@ -172,7 +168,7 @@ class OrderController extends Controller
     {
         $phone = trim((string) \input('phone', ''));
         try {
-            $this->json(CustomerModel::lookup($phone));
+            $this->json(CustomerBlacklistModel::attachToProfile(CustomerModel::lookup($phone)));
         } catch (\Throwable $exception) {
             $this->json(['message' => 'Không tra cứu được lịch sử khách hàng.'], 500);
         }
@@ -180,17 +176,7 @@ class OrderController extends Controller
 
     public function customerBlacklist(): void
     {
-        $phone = trim((string) \input('phone', ''));
-        $blacklisted = (int) \input('is_blacklisted', 1) === 1;
-        $reason = trim((string) \input('reason', ''));
-
-        try {
-            $this->json(CustomerModel::setBlacklist($phone, $blacklisted, $reason, (int) \current_user()['id'], null));
-        } catch (\InvalidArgumentException $exception) {
-            $this->json(['message' => $exception->getMessage()], 422);
-        } catch (\Throwable $exception) {
-            $this->json(['message' => 'Không cập nhật được blacklist. Hãy kiểm tra đã import migration customers/blacklist chưa.'], 500);
-        }
+        $this->json(['message' => 'Blacklist cần gắn theo từng đơn hàng. Vào chi tiết đơn bị hủy/boom để thêm blacklist.'], 422);
     }
 
     public function markSentAfterCopy(int $id): void
@@ -332,7 +318,7 @@ class OrderController extends Controller
                 return $aRecent ? -1 : 1;
             }
             if ($aRecent && $bRecent) {
-                return $recentRank[$aId] <=> $recentRank[$bId];
+                return $recentRank[$aId] <=> $bRecent[$bId];
             }
 
             return ((int) ($a['_original_index'] ?? 0)) <=> ((int) ($b['_original_index'] ?? 0));
