@@ -39,7 +39,7 @@
 
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = `/assets/css/menu-card-redesign.css?v=${encodeURIComponent(appVersion())}`;
+    link.href = `/assets/css/menu-card-redesign-v2.css?v=${encodeURIComponent(appVersion())}`;
     link.dataset.menuCardRedesignCss = '1';
     document.head.appendChild(link);
   }
