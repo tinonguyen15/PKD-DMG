@@ -1,0 +1,150 @@
+/* Compact sidebar override */
+.app-shell {
+  grid-template-columns: 228px minmax(0, 1fr) !important;
+}
+
+.sidebar {
+  padding: 14px 10px !important;
+  gap: 12px !important;
+}
+
+.sidebar-top {
+  gap: 8px !important;
+}
+
+.sidebar-quick {
+  display: none !important;
+}
+
+.brand {
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  gap: 9px !important;
+  padding: 6px 6px 8px !important;
+  border-radius: 14px !important;
+}
+
+.brand-mark,
+.brand span.brand-mark {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 13px !important;
+  font-size: 11px !important;
+}
+
+.brand-copy strong {
+  font-size: 15px !important;
+  line-height: 1.05 !important;
+}
+
+.brand-copy small {
+  font-size: 10px !important;
+}
+
+.sidebar-nav {
+  gap: 10px !important;
+}
+
+.nav-section {
+  gap: 4px !important;
+}
+
+.nav-section-title {
+  margin: 0 6px 2px !important;
+  font-size: 10px !important;
+  letter-spacing: .1em !important;
+}
+
+.nav-link {
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  gap: 8px !important;
+  min-height: 46px !important;
+  padding: 6px 8px !important;
+  border-radius: 13px !important;
+}
+
+.nav-link:hover {
+  transform: translateX(1px) !important;
+}
+
+.nav-link.active,
+.nav-link[aria-current="page"] {
+  box-shadow: inset 3px 0 0 #5fe08f !important;
+}
+
+.nav-link.active::after,
+.nav-link[aria-current="page"]::after {
+  right: 8px !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.nav-icon {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 12px !important;
+  font-size: 15px !important;
+}
+
+.nav-copy {
+  padding-right: 12px !important;
+}
+
+.nav-copy strong {
+  font-size: 13px !important;
+}
+
+.nav-copy small {
+  display: none !important;
+}
+
+.sidebar-footer {
+  gap: 8px !important;
+}
+
+.sidebar-account {
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  border-radius: 13px !important;
+}
+
+.account-avatar {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 11px !important;
+}
+
+.account-copy strong {
+  font-size: 12px !important;
+}
+
+.account-copy small {
+  font-size: 10px !important;
+}
+
+.sidebar-logout,
+.sidebar-footer .btn.sidebar-logout {
+  min-height: 36px !important;
+  border-radius: 12px !important;
+}
+
+@media (max-width: 1360px) {
+  .app-shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sidebar {
+    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(190px, 220px) !important;
+    gap: 12px !important;
+  }
+
+  .nav-section {
+    min-width: 175px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    grid-template-columns: 1fr !important;
+  }
+}
