@@ -23,28 +23,28 @@
   .sidebar{padding-top:10px!important;padding-bottom:10px!important;gap:9px!important}.sidebar-quick{display:none!important}.nav-link{min-height:44px!important}.nav-copy small{display:none!important}.sidebar-account{padding:7px!important}.account-avatar{width:34px!important;height:34px!important}.sidebar-logout,.sidebar-footer .btn.sidebar-logout{min-height:36px!important}
 }
 
+/* /orders/create: main content scrolls normally; right preview sticks to viewport */
 @media(min-width:1181px){
-  body.page-order-create{height:100dvh!important;overflow:hidden!important;background:#f6f7f4!important}
-  body.page-order-create .main{height:100dvh!important;min-height:100dvh!important;overflow:hidden!important;padding:16px!important}
-  body.page-order-create .order-create-hero{margin-bottom:12px!important;padding:14px 16px!important;border-radius:18px!important}
+  body.page-order-create{height:auto!important;min-height:100dvh!important;overflow-y:auto!important;overflow-x:hidden!important;background:#f6f7f4!important}
+  body.page-order-create .main{height:auto!important;min-height:100dvh!important;overflow:visible!important;padding:16px!important}
+  body.page-order-create .order-create-hero{position:relative!important;margin-bottom:12px!important;padding:14px 16px!important;border-radius:18px!important}
   body.page-order-create .order-create-hero h1{font-size:26px!important}
   body.page-order-create .order-create-hero p{margin-top:5px!important;font-size:13px!important;line-height:1.45!important}
-  body.page-order-create .order-layout{height:calc(100dvh - 116px)!important;max-height:calc(100dvh - 116px)!important;min-height:0!important;grid-template-columns:minmax(0,1fr) minmax(355px,405px)!important;grid-template-rows:auto minmax(0,auto) minmax(0,1fr)!important;grid-template-areas:"draft cart" "form cart" "menu cart"!important;gap:12px!important;overflow:hidden!important;align-items:stretch!important}
-  body.page-order-create .draft-panel{min-height:0!important;max-height:112px!important;overflow:hidden!important;margin:0!important}
-  body.page-order-create .draft-strip{max-height:48px!important;overflow-x:auto!important;overflow-y:hidden!important}
-  body.page-order-create .order-form-panel{min-height:0!important;max-height:min(42dvh,390px)!important;overflow-y:auto!important;margin:0!important;scrollbar-width:thin}
-  body.page-order-create .order-form-panel::-webkit-scrollbar{width:6px}body.page-order-create .order-form-panel::-webkit-scrollbar-thumb{background:#d0d5dd;border-radius:999px}
-  body.page-order-create .customer-insight{max-height:250px!important;overflow-y:auto!important}
-  body.page-order-create .menu-panel{min-height:0!important;height:100%!important;overflow:hidden!important;margin:0!important;display:flex!important;flex-direction:column!important}
-  body.page-order-create .menu-panel .section-head,body.page-order-create .menu-panel .chip-row{position:static!important;flex:0 0 auto!important}
-  body.page-order-create .menu-grid{flex:1 1 auto!important;min-height:0!important;max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;padding-right:6px!important;scrollbar-width:thin}
-  body.page-order-create .menu-grid::-webkit-scrollbar{width:6px}body.page-order-create .menu-grid::-webkit-scrollbar-thumb{background:#d0d5dd;border-radius:999px}
-  body.page-order-create .cart-panel{position:relative!important;top:auto!important;height:100%!important;min-height:0!important;max-height:none!important;margin:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important}
+  body.page-order-create .order-layout{height:auto!important;max-height:none!important;min-height:0!important;grid-template-columns:minmax(0,1fr) minmax(355px,405px)!important;grid-template-areas:"draft cart" "form cart" "menu cart"!important;gap:12px!important;overflow:visible!important;align-items:start!important}
+  body.page-order-create .draft-panel{min-height:0!important;max-height:none!important;overflow:visible!important;margin:0!important}
+  body.page-order-create .draft-strip{max-height:none!important;overflow-x:auto!important;overflow-y:hidden!important}
+  body.page-order-create .order-form-panel{min-height:0!important;max-height:none!important;overflow:visible!important;margin:0!important}
+  body.page-order-create .customer-insight{max-height:none!important;overflow:visible!important}
+  body.page-order-create .menu-panel{min-height:0!important;height:auto!important;overflow:visible!important;margin:0!important;display:block!important}
+  body.page-order-create .menu-panel .section-head{position:sticky!important;top:0!important;z-index:5!important}
+  body.page-order-create .menu-panel .chip-row{position:sticky!important;top:60px!important;z-index:4!important}
+  body.page-order-create .menu-grid{max-height:none!important;overflow:visible!important;padding-right:0!important}
+  body.page-order-create .cart-panel{position:sticky!important;top:16px!important;align-self:start!important;height:calc(100dvh - 32px)!important;min-height:0!important;max-height:calc(100dvh - 32px)!important;margin:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important}
   body.page-order-create .copy-box{flex:1 1 auto!important;min-height:0!important;height:auto!important;overflow:auto!important}
-  body.page-order-create .cart-lines{flex:0 0 auto!important;max-height:22%!important;overflow-y:auto!important}
+  body.page-order-create .cart-lines{flex:0 0 auto!important;max-height:24%!important;overflow-y:auto!important}
   body.page-order-create .primary-actions{flex:0 0 auto!important;margin-top:10px!important}
 }
 
 @media(max-width:1180px){
-  body.page-order-create{height:auto;overflow:auto}.sidebar{max-height:none}.main{min-height:100dvh}.order-create-hero{margin-bottom:14px}.order-layout{height:auto!important;max-height:none!important;overflow:visible!important}.cart-panel{height:auto!important;max-height:none!important;overflow:visible!important}.menu-grid{max-height:none!important;overflow:visible!important}
+  body.page-order-create{height:auto!important;overflow:auto!important}.sidebar{max-height:none}.main{min-height:100dvh}.order-create-hero{margin-bottom:14px}.order-layout{height:auto!important;max-height:none!important;overflow:visible!important}.cart-panel{height:auto!important;max-height:none!important;overflow:visible!important}.menu-grid{max-height:none!important;overflow:visible!important}
 }
