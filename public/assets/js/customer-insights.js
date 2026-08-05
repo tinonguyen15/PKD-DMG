@@ -25,11 +25,7 @@
 
   function escapeHtml(value) {
     return String(value || '').replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[char]));
   }
 
@@ -38,37 +34,35 @@
   }
 
   function dateText(value) {
-    if (!value) return 'Chưa có';
+    if (!value) return '-';
     const date = new Date(String(value).replace(' ', 'T'));
     if (Number.isNaN(date.getTime())) return String(value);
     return date.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
   function statusLabel(value) {
-    return {
-      processing: 'Đang xử lý',
-      sent: 'Đã gửi CN',
-      completed: 'Hoàn thành',
-      cancelled: 'Đã hủy'
-    }[value] || value || 'Không rõ';
+    return { processing: 'Xử lý', sent: 'Đã gửi', completed: 'Hoàn', cancelled: 'Hủy' }[value] || value || '-';
   }
 
   function orderTypeLabel(value) {
-    return {
-      delivery: 'Mang về',
-      pickup: 'Khách ghé lấy',
-      booking: 'Đặt bàn'
-    }[value] || value || '';
+    return { delivery: 'Mang về', pickup: 'Ghé lấy', booking: 'Đặt bàn' }[value] || value || '';
+  }
+
+  function itemSummary(order) {
+    const items = Array.isArray(order.items) ? order.items : [];
+    if (!items.length) return 'Chưa có món';
+    const names = items.slice(0, 2).map((item) => `${Number(item.quantity || 0)} ${item.customer_name || item.item_name || 'món'}`);
+    return `${names.join(', ')}${items.length > 2 ? ` +${items.length - 2}` : ''}`;
   }
 
   function setLoading() {
     panel.hidden = false;
     panel.classList.remove('is-danger', 'is-good', 'is-empty');
     panel.classList.add('is-loading');
-    if (status) status.textContent = 'Đang tra cứu';
-    if (title) title.textContent = 'Đang kiểm tra lịch sử khách hàng...';
+    if (status) status.textContent = 'Đang check';
+    if (title) title.textContent = 'Lịch sử khách';
     if (warning) warning.hidden = true;
-    if (metrics) metrics.innerHTML = '<span class="customer-skeleton"></span><span class="customer-skeleton"></span><span class="customer-skeleton"></span>';
+    if (metrics) metrics.innerHTML = '<span class="customer-skeleton"></span><span class="customer-skeleton"></span>';
     if (last) last.innerHTML = '';
     if (orders) orders.innerHTML = '';
   }
@@ -76,13 +70,6 @@
   function hidePanel() {
     panel.hidden = true;
     lastPayload = null;
-  }
-
-  function itemSummary(order) {
-    const items = Array.isArray(order.items) ? order.items : [];
-    if (!items.length) return 'Chưa có dữ liệu món';
-    const names = items.slice(0, 3).map((item) => `${Number(item.quantity || 0)} ${item.customer_name || item.item_name || 'món'}`);
-    return `${names.join(', ')}${items.length > 3 ? ` +${items.length - 3} món` : ''}`;
   }
 
   function render(payload) {
@@ -95,27 +82,23 @@
     const cancelledOrders = Number(summary.cancelled_orders || 0);
     const completedOrders = Number(summary.completed_orders || 0);
     const cancelRate = totalOrders > 0 ? Math.round((cancelledOrders / totalOrders) * 100) : 0;
+    const customerName = customer.name || summary.last_customer_name || 'Chưa có tên';
+    const customerAddress = customer.address || summary.last_address || '';
 
     panel.hidden = false;
     panel.classList.remove('is-loading', 'is-danger', 'is-good', 'is-empty');
     panel.classList.add(isBlacklisted ? 'is-danger' : (totalOrders > 0 ? 'is-good' : 'is-empty'));
 
-    if (status) {
-      status.textContent = isBlacklisted ? 'Blacklist' : (totalOrders > 0 ? 'Khách quen' : 'Khách mới');
-    }
-    if (title) {
-      title.textContent = isBlacklisted
-        ? 'Cảnh báo khách trong blacklist'
-        : (totalOrders > 0 ? 'Lịch sử mua hàng của khách' : 'Chưa có lịch sử mua hàng');
-    }
+    if (status) status.textContent = isBlacklisted ? 'Blacklist' : (totalOrders > 0 ? 'Khách quen' : 'Khách mới');
+    if (title) title.textContent = isBlacklisted ? 'Cảnh báo khách' : 'Lịch sử khách';
 
     if (warning) {
       if (isBlacklisted) {
         warning.hidden = false;
-        warning.innerHTML = `<strong>⚠ Khách đang trong blacklist.</strong><span>${escapeHtml(customer.blacklist_reason || 'Cần kiểm tra kỹ trước khi nhận đơn.')}</span>`;
-      } else if (cancelledOrders >= 2 || cancelRate >= 50) {
+        warning.innerHTML = `<strong>⚠ Blacklist</strong><span>${escapeHtml(customer.blacklist_reason || 'Kiểm tra kỹ trước khi nhận đơn.')}</span>`;
+      } else if (cancelledOrders >= 1 && cancelRate >= 50) {
         warning.hidden = false;
-        warning.innerHTML = `<strong>⚠ Khách có tỷ lệ hủy/boom cao.</strong><span>${cancelledOrders}/${totalOrders} đơn đã hủy (${cancelRate}%). Nên xác nhận kỹ trước khi gửi chi nhánh.</span>`;
+        warning.innerHTML = `<strong>⚠ Hủy cao</strong><span>${cancelledOrders}/${totalOrders} đơn (${cancelRate}%). Xác nhận kỹ.</span>`;
       } else {
         warning.hidden = true;
         warning.innerHTML = '';
@@ -124,23 +107,23 @@
 
     if (metrics) {
       metrics.innerHTML = `
-        <article><span>Tổng đơn</span><strong>${totalOrders}</strong></article>
-        <article><span>Hoàn thành</span><strong>${completedOrders}</strong></article>
-        <article><span>Đã hủy</span><strong>${cancelledOrders}</strong></article>
-        <article><span>Doanh thu hoàn thành</span><strong>${money(summary.completed_revenue || 0)}</strong></article>
+        <article><span>Đơn</span><strong>${totalOrders}</strong></article>
+        <article><span>Hoàn</span><strong>${completedOrders}</strong></article>
+        <article><span>Hủy</span><strong>${cancelledOrders}</strong></article>
+        <article><span>DT hoàn</span><strong>${money(summary.completed_revenue || 0)}</strong></article>
       `;
     }
 
     if (last) {
       if (totalOrders > 0 || customer.name || customer.address) {
         last.innerHTML = `
-          <div><span>Tên gần nhất</span><strong>${escapeHtml(customer.name || summary.last_customer_name || 'Chưa có')}</strong></div>
-          <div><span>Địa chỉ gần nhất</span><strong>${escapeHtml(customer.address || summary.last_address || 'Chưa có')}</strong></div>
-          <div><span>Lần mua gần nhất</span><strong>${escapeHtml(dateText(summary.last_order_at))}</strong></div>
-          <div><span>CN/Nguồn gần nhất</span><strong>${escapeHtml([summary.last_branch_name, summary.last_source_name].filter(Boolean).join(' · ') || 'Chưa có')}</strong></div>
+          <div><span>Khách</span><strong>${escapeHtml(customerName)}</strong></div>
+          <div><span>Gần nhất</span><strong>${escapeHtml(dateText(summary.last_order_at))}</strong></div>
+          <div class="wide"><span>CN/Nguồn</span><strong>${escapeHtml([summary.last_branch_name, summary.last_source_name].filter(Boolean).join(' · ') || '-')}</strong></div>
+          ${customerAddress ? `<div class="wide"><span>Địa chỉ</span><strong>${escapeHtml(customerAddress)}</strong></div>` : ''}
         `;
       } else {
-        last.innerHTML = '<p class="empty small">SĐT này chưa có đơn cũ. Có thể là khách mới.</p>';
+        last.innerHTML = '<p class="empty small">Chưa có đơn cũ.</p>';
       }
     }
 
@@ -159,9 +142,7 @@
                 </a>
                 <em class="status-${escapeHtml(order.workflow_status)}">${escapeHtml(statusLabel(order.workflow_status))}</em>
                 <strong>${money(order.total || 0)}</strong>
-                <button class="btn ghost small-btn reuse-items-btn" type="button" data-reuse-order="${Number(order.id)}" ${hasReusableItems ? '' : 'disabled'}>
-                  Dùng lại món
-                </button>
+                <button class="btn ghost small-btn reuse-items-btn" type="button" data-reuse-order="${Number(order.id)}" ${hasReusableItems ? '' : 'disabled'}>Dùng món</button>
               </div>
             `;
           }).join('')}`
@@ -169,13 +150,14 @@
     }
 
     if (fillButton) {
+      fillButton.textContent = 'Dùng thông tin';
       fillButton.hidden = !(customer.name || summary.last_customer_name || customer.address || summary.last_address);
     }
     if (addButton) addButton.hidden = isBlacklisted;
     if (removeButton) removeButton.hidden = !isBlacklisted;
     if (reasonInput) {
       reasonInput.value = isBlacklisted ? (customer.blacklist_reason || '') : '';
-      reasonInput.placeholder = isBlacklisted ? 'Lý do blacklist' : 'Lý do blacklist, ví dụ: boom hàng nhiều lần';
+      reasonInput.placeholder = isBlacklisted ? 'Lý do blacklist' : 'Lý do blacklist';
     }
   }
 
@@ -204,19 +186,17 @@
     }
     setLoading();
     lookupTimer = setTimeout(() => {
-      lookup(rawPhone)
-        .then(render)
-        .catch((error) => {
-          if (error.name === 'AbortError') return;
-          panel.hidden = false;
-          panel.classList.remove('is-loading', 'is-good', 'is-empty');
-          panel.classList.add('is-danger');
-          if (status) status.textContent = 'Lỗi tra cứu';
-          if (title) title.textContent = error.message || 'Không tra cứu được khách hàng';
-          if (metrics) metrics.innerHTML = '';
-          if (last) last.innerHTML = '';
-          if (orders) orders.innerHTML = '';
-        });
+      lookup(rawPhone).then(render).catch((error) => {
+        if (error.name === 'AbortError') return;
+        panel.hidden = false;
+        panel.classList.remove('is-loading', 'is-good', 'is-empty');
+        panel.classList.add('is-danger');
+        if (status) status.textContent = 'Lỗi';
+        if (title) title.textContent = error.message || 'Không tra cứu được';
+        if (metrics) metrics.innerHTML = '';
+        if (last) last.innerHTML = '';
+        if (orders) orders.innerHTML = '';
+      });
     }, 420);
   }
 
@@ -254,22 +234,14 @@
     const order = (lastPayload?.recent_orders || []).find((item) => Number(item.id) === Number(orderId));
     const items = Array.isArray(order?.items) ? order.items : [];
     if (!items.length) {
-      alert('Đơn cũ này chưa có dữ liệu món để dùng lại.');
+      alert('Đơn cũ này chưa có dữ liệu món.');
       return;
     }
 
-    if (['delivery', 'pickup'].includes(order.order_type)) {
-      setRadioValue('order_type', order.order_type);
-    } else {
-      setRadioValue('order_type', 'delivery');
-    }
+    setRadioValue('order_type', ['delivery', 'pickup'].includes(order.order_type) ? order.order_type : 'delivery');
 
-    form.querySelectorAll("[name^='items[']").forEach((input) => {
-      input.value = '0';
-    });
-    form.querySelectorAll("[name^='item_notes[']").forEach((input) => {
-      input.value = '';
-    });
+    form.querySelectorAll("[name^='items[']").forEach((input) => { input.value = '0'; });
+    form.querySelectorAll("[name^='item_notes[']").forEach((input) => { input.value = ''; });
 
     let applied = 0;
     const grouped = new Map();
@@ -294,16 +266,7 @@
 
     form.dispatchEvent(new Event('input', { bubbles: true }));
     form.dispatchEvent(new Event('change', { bubbles: true }));
-
-    if (applied > 0) {
-      const firstQty = form.querySelector("[name^='items['][value]:not([value='0'])");
-      firstQty?.closest('[data-menu-card]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    alert(applied > 0
-      ? `Đã dùng lại ${applied} món từ đơn ${order.order_code || ''}.`
-      : 'Các món trong đơn cũ không còn khớp menu hiện tại, không áp dụng được.'
-    );
+    alert(applied > 0 ? `Đã dùng lại ${applied} món.` : 'Món cũ không còn khớp menu hiện tại.');
   }
 
   phoneInput.addEventListener('input', scheduleLookup);
@@ -331,19 +294,11 @@
   });
 
   addButton?.addEventListener('click', async () => {
-    try {
-      await setBlacklist(true);
-    } catch (error) {
-      alert(error.message || 'Không thêm được blacklist');
-    }
+    try { await setBlacklist(true); } catch (error) { alert(error.message || 'Không thêm được blacklist'); }
   });
 
   removeButton?.addEventListener('click', async () => {
-    try {
-      await setBlacklist(false);
-    } catch (error) {
-      alert(error.message || 'Không gỡ được blacklist');
-    }
+    try { await setBlacklist(false); } catch (error) { alert(error.message || 'Không gỡ được blacklist'); }
   });
 
   if (normalizedPhone(phoneInput.value).length >= 8) {
