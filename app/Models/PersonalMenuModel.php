@@ -85,6 +85,16 @@ class PersonalMenuModel
             $result[] = $item;
         }
 
+        usort($result, static function (array $a, array $b): int {
+            $aSort = (int) ($a['_personal_sort_order'] ?? 999999);
+            $bSort = (int) ($b['_personal_sort_order'] ?? 999999);
+            if ($aSort !== $bSort) {
+                return $aSort <=> $bSort;
+            }
+
+            return ((int) ($a['_original_index'] ?? 0)) <=> ((int) ($b['_original_index'] ?? 0));
+        });
+
         return $result;
     }
 
