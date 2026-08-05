@@ -54,6 +54,8 @@ $selectedPaymentCandidate = (int) ($old['payment_method_id'] ?? $defaultPaymentI
 $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?: $defaultPaymentId($selectedType);
 ?>
 
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/menu-card-click.css')) ?>">
+
 <?php if ($errors): ?>
   <div class="alert danger">
     <?php foreach ($errors as $message): ?><div><?= e($message) ?></div><?php endforeach; ?>
@@ -253,3 +255,5 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
     </div>
   </aside>
 </form>
+
+<script src="<?= e(asset_url('/assets/js/menu-card-click.js')) ?>"></script>
