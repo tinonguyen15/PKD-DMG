@@ -3,14 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="app-version" content="<?= e(app_version()) ?>">
   <title><?= e($title ?? config('app.name')) ?> - <?= e(config('app.name')) ?></title>
-  <link rel="stylesheet" href="<?= e(url('/assets/css/app.css')) ?>">
-  <link rel="stylesheet" href="<?= e(url('/assets/css/sidebar.css?v=20260805-1')) ?>">
-  <link rel="stylesheet" href="<?= e(url('/assets/css/brand-assets.css?v=20260805-3')) ?>">
+  <link rel="stylesheet" href="<?= e(asset_url('/assets/css/app.css')) ?>">
+  <link rel="stylesheet" href="<?= e(asset_url('/assets/css/sidebar.css')) ?>">
+  <link rel="stylesheet" href="<?= e(asset_url('/assets/css/brand-assets.css')) ?>">
   <?php if (($title ?? '') === 'Tạo đơn'): ?>
-    <link rel="stylesheet" href="<?= e(url('/assets/css/customer-insights.css?v=20260805-2')) ?>">
+    <link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-insights.css')) ?>">
+    <link rel="stylesheet" href="<?= e(asset_url('/assets/css/order-create.css')) ?>">
   <?php endif; ?>
-  <link rel="stylesheet" href="<?= e(url('/assets/css/layout-fixes.css?v=20260805-2')) ?>">
+  <link rel="stylesheet" href="<?= e(asset_url('/assets/css/layout-fixes.css')) ?>">
 </head>
 <body class="<?= e(($title ?? '') === 'Tạo đơn' ? 'page-order-create' : '') ?>">
   <?php
@@ -188,6 +190,7 @@
           <?= csrf_field() ?>
           <button class="btn ghost full sidebar-logout" type="submit">Đăng xuất</button>
         </form>
+        <small class="app-version">v<?= e(app_version()) ?></small>
       </div>
     </aside>
     <main class="main">
@@ -202,15 +205,15 @@
     </main>
   </div>
   <div id="toast-root" class="toast-root"></div>
-  <script src="<?= e(url('/assets/js/app.js')) ?>"></script>
+  <script src="<?= e(asset_url('/assets/js/app.js')) ?>"></script>
   <?php if (($title ?? '') === 'Tạo đơn'): ?>
-    <script src="<?= e(url('/assets/js/customer-insights.js?v=20260805-2')) ?>"></script>
+    <script src="<?= e(asset_url('/assets/js/customer-insights.js')) ?>"></script>
   <?php endif; ?>
   <?php if (($title ?? '') === 'Cài đặt'): ?>
-    <script src="<?= e(url('/assets/js/settings-autosave.js?v=20260804-4')) ?>"></script>
+    <script src="<?= e(asset_url('/assets/js/settings-autosave.js')) ?>"></script>
   <?php endif; ?>
   <?php if (($title ?? '') === 'Tiếp nhận'): ?>
-    <script src="<?= e(url('/assets/js/contacts.js?v=20260804-2')) ?>"></script>
+    <script src="<?= e(asset_url('/assets/js/contacts.js')) ?>"></script>
   <?php endif; ?>
 </body>
 </html>
