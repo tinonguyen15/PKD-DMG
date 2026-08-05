@@ -19,9 +19,6 @@ class OrderController extends Controller
         $userId = (int) \current_user()['id'];
         $preferences = PreferenceModel::resolved($userId);
         $favoriteItemIds = array_map('intval', (array) ($preferences['favorite_menu_item_ids'] ?? []));
-        $recentItemIds = !empty($preferences['show_recent_menu_items_first'])
-            ? OrderModel::recentMenuItemIds($userId)
-            : [];
         $activeOrders = array_values(array_filter(
             OrderModel::all(),
             static fn(array $order): bool => in_array((string) ($order['workflow_status'] ?? ''), ['processing', 'sent'], true)
@@ -31,13 +28,12 @@ class OrderController extends Controller
             'title' => 'Tạo đơn',
             'branches' => CatalogModel::branches(),
             'categories' => CatalogModel::menuCategories(),
-            'items' => $this->sortedMenuItems(CatalogModel::menuItems(), $favoriteItemIds, $recentItemIds),
+            'items' => $this->sortedMenuItems(CatalogModel::menuItems(), $favoriteItemIds),
             'sources' => CatalogModel::orderSources(),
             'payments' => CatalogModel::paymentMethods(),
             'orderPreferences' => $preferences,
             'quickNoticeLabels' => OrderModel::quickNoticeLabelsForPreferences($preferences),
             'favoriteItemIds' => $favoriteItemIds,
-            'recentItemIds' => $recentItemIds,
             'drafts' => OrderDraftModel::forUser($userId),
             'activeOrders' => $activeOrders,
             'workflowLabels' => OrderModel::WORKFLOW_LABELS,
@@ -358,17 +354,16 @@ class OrderController extends Controller
         };
     }
 
-    private function sortedMenuItems(array $items, array $favoriteItemIds, array $recentItemIds): array
+    private function sortedMenuItems(array $items, array $favoriteItemIds): array
     {
         $favoriteRank = array_flip(array_values(array_unique(array_map('intval', $favoriteItemIds))));
-        $recentRank = array_flip(array_values(array_unique(array_map('intval', $recentItemIds))));
 
         foreach ($items as $index => &$item) {
             $item['_original_index'] = $index;
         }
         unset($item);
 
-        usort($items, static function (array $a, array $b) use ($favoriteRank, $recentRank): int {
+        usort($items, static function (array $a, array $b) use ($favoriteRank): int {
             $aId = (int) $a['id'];
             $bId = (int) $b['id'];
             $aFavorite = array_key_exists($aId, $favoriteRank);
@@ -378,15 +373,6 @@ class OrderController extends Controller
             }
             if ($aFavorite && $bFavorite) {
                 return $favoriteRank[$aId] <=> $favoriteRank[$bId];
-            }
-
-            $aRecent = array_key_exists($aId, $recentRank);
-            $bRecent = array_key_exists($bId, $recentRank);
-            if ($aRecent !== $bRecent) {
-                return $aRecent ? -1 : 1;
-            }
-            if ($aRecent && $bRecent) {
-                return $recentRank[$aId] <=> $recentRank[$bId];
             }
 
             return ((int) ($a['_original_index'] ?? 0)) <=> ((int) ($b['_original_index'] ?? 0));
