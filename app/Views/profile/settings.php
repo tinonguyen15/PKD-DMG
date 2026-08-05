@@ -39,4 +39,4 @@
   </form>
 </section>
 
-<script src="<?= e(asset_url('/assets/js/profile-personal-menu.js')) ?>"></script>
+<script src="<?= e(asset_url('/assets/js/profile-personal-menu-v2.js')) ?>"></script>
