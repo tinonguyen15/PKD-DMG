@@ -25,7 +25,8 @@
       .menu-card[data-alert-level="soon"]{background:#fffaeb!important;box-shadow:inset 0 0 0 2px #fdb022}.menu-card[data-alert-level="paused"]{background:#fff4e5!important;box-shadow:inset 0 0 0 2px #fb8500}.menu-card[data-alert-level="out"]{background:#fef3f2!important;box-shadow:inset 0 0 0 2px #f04438}
       .menu-alert-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px}.menu-alert-badge{display:inline-flex;align-items:center;max-width:150px;min-height:24px;padding:3px 8px;border-radius:999px;background:#ecfdf3;color:#027a48;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.menu-alert-badge.soon{background:#fffaeb;color:#b54708}.menu-alert-badge.paused{background:#fff4e5;color:#c25b00}.menu-alert-badge.out{background:#fef3f2;color:#b42318}.menu-alert-btn{min-height:26px;padding:4px 8px;border:1px solid #d0d5dd;border-radius:999px;background:#fff;color:#344054;font-size:11px;font-weight:900;cursor:pointer}.menu-alert-btn:hover{border-color:#0f6b48;color:#0f6b48;background:#f5fff8}
       .menu-alert-modal{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:rgba(16,24,40,.42);padding:16px}.menu-alert-dialog{width:min(430px,100%);border-radius:18px;background:#fff;box-shadow:0 22px 70px rgba(16,24,40,.28);padding:16px;display:grid;gap:12px}.menu-alert-dialog h3{margin:0;color:#101828}.menu-alert-dialog p{margin:0;color:#475467;font-size:13px}.menu-alert-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.menu-alert-actions button,.menu-alert-footer button{min-height:38px;border:1px solid #d0d5dd;border-radius:12px;background:#fff;font-weight:900;cursor:pointer}.menu-alert-actions button[data-alert-action="paused-10"]{background:#fffaeb;color:#b54708}.menu-alert-actions button[data-alert-action="paused-30"]{background:#fff4e5;color:#c25b00}.menu-alert-actions button[data-alert-action="out"]{background:#fef3f2;color:#b42318}.menu-alert-actions button[data-alert-action="clear"]{background:#ecfdf3;color:#027a48}.menu-alert-dialog textarea{width:100%;min-height:70px;border:1px solid #d0d5dd;border-radius:12px;padding:10px;font:inherit;resize:vertical}.menu-alert-footer{display:flex;justify-content:flex-end;gap:8px}.menu-alert-toast{position:fixed;left:50%;bottom:20px;z-index:10000;transform:translateX(-50%);padding:10px 14px;border-radius:999px;background:#101828;color:#fff;font-weight:900;font-size:13px;box-shadow:0 12px 30px rgba(16,24,40,.26)}
-      @media(max-width:700px){.menu-alert-actions{grid-template-columns:1fr}.menu-alert-badge{max-width:120px}}
+      .menu-warning-modal{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.45);backdrop-filter:blur(4px)}.menu-warning-dialog{width:min(480px,100%);background:#fff;border-radius:22px;box-shadow:0 24px 80px rgba(15,23,42,.25);padding:22px;display:grid;gap:16px;animation:menuWarningIn .18s ease-out}.menu-warning-dialog.is-warning{border-top:6px solid #f59e0b}.menu-warning-dialog.is-paused{border-top:6px solid #f97316}.menu-warning-dialog.is-danger{border-top:6px solid #ef4444}.menu-warning-head{display:flex;align-items:flex-start;gap:14px}.menu-warning-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#fff7ed,#ffedd5);color:#c2410c;font-size:24px;font-weight:900;flex:0 0 auto}.menu-warning-head h3{margin:0 0 4px;font-size:20px;line-height:1.2;color:#101828}.menu-warning-head p{margin:0;color:#667085;font-size:14px}.menu-warning-body{display:grid;gap:10px;padding:14px;border-radius:16px;background:#f8fafc;border:1px solid #e4e7ec}.menu-warning-status{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:7px 12px;border-radius:999px;background:#fff7ed;color:#c2410c;font-size:13px;font-weight:800}.menu-warning-line{display:grid;gap:3px}.menu-warning-line span{color:#667085;font-size:12px;font-weight:700;text-transform:uppercase}.menu-warning-line strong{color:#101828;font-size:14px;line-height:1.45}.menu-warning-message{color:#344054;font-size:14px;line-height:1.5}.menu-warning-actions{display:flex;justify-content:flex-end;gap:10px}.menu-warning-actions .btn-secondary,.menu-warning-actions .btn-primary{min-width:120px;min-height:44px;border-radius:14px;font-weight:800;font-size:14px;cursor:pointer;border:1px solid transparent}.menu-warning-actions .btn-secondary{background:#fff;border-color:#d0d5dd;color:#344054}.menu-warning-actions .btn-secondary:hover{background:#f9fafb}.menu-warning-actions .btn-primary{background:#16a34a;color:#fff}.menu-warning-actions .btn-primary:hover{background:#15803d}@keyframes menuWarningIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+      @media(max-width:700px){.menu-alert-actions{grid-template-columns:1fr}.menu-alert-badge{max-width:120px}.menu-warning-dialog{padding:18px;border-radius:18px}.menu-warning-actions{flex-direction:column-reverse}.menu-warning-actions .btn-secondary,.menu-warning-actions .btn-primary{width:100%}}
     `;
     document.head.appendChild(style);
   }
@@ -64,7 +65,7 @@
       if (!card || event.target.closest('[data-menu-alert-tools]') || event.target.closest('[data-item-note-row]') || event.target.closest('.qty-input')) return;
       const step = event.target.closest('[data-qty-step]');
       if (step && Number(step.dataset.qtyStep || 0) <= 0) return;
-      if (!warnBeforeAdding(card)) {
+      if (!warnBeforeAdding(card, event.target)) {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
@@ -99,7 +100,7 @@
     });
   }
 
-  function warnBeforeAdding(card) {
+  function warnBeforeAdding(card, originalTarget) {
     const branchId = selectedBranchId();
     const itemId = menuItemId(card);
     const alert = branchId ? alertFor(branchId, itemId) : null;
@@ -110,11 +111,101 @@
 
     const itemName = $('.dish-info strong', card)?.textContent?.trim() || alert.item_name || 'Món này';
     const branchName = $('[name="branch_id"] option:checked', form)?.textContent?.trim() || alert.branch_name || 'chi nhánh này';
-    const note = alert.note ? `\nGhi chú: ${alert.note}` : '';
-    const who = alert.updated_by_name ? `\nNgười cập nhật: ${alert.updated_by_name}` : '';
-    const ok = window.confirm(`${itemName} tại ${branchName} đang cảnh báo: ${alert.label}.${note}${who}\n\nVẫn muốn chọn món này?`);
-    if (ok) ignoredWarnings.add(key);
-    return ok;
+
+    openWarningModal({
+      itemName,
+      branchName,
+      alertLabel: alert.label || 'Đang cảnh báo',
+      note: alert.note || '',
+      updatedBy: alert.updated_by_name || '',
+      level: alert.level || 'paused',
+      onConfirm: () => {
+        ignoredWarnings.add(key);
+        continueAddAfterWarning(card, originalTarget);
+      }
+    });
+
+    return false;
+  }
+
+  function continueAddAfterWarning(card, originalTarget) {
+    const plusButton = card.querySelector('[data-qty-step="1"]');
+    if (!plusButton) return;
+
+    if (originalTarget?.closest?.('[data-qty-step="1"]')) {
+      plusButton.click();
+      return;
+    }
+
+    plusButton.click();
+  }
+
+  function openWarningModal({ itemName, branchName, alertLabel, note, updatedBy, level, onConfirm }) {
+    const existing = document.querySelector('[data-warning-modal]');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'menu-warning-modal';
+    modal.dataset.warningModal = '1';
+
+    const levelClass = level === 'out'
+      ? 'is-danger'
+      : (level === 'soon' ? 'is-warning' : 'is-paused');
+
+    modal.innerHTML = `
+      <div class="menu-warning-dialog ${levelClass}" role="dialog" aria-modal="true" aria-labelledby="menu-warning-title">
+        <div class="menu-warning-head">
+          <div class="menu-warning-icon">!</div>
+          <div>
+            <h3 id="menu-warning-title">Cảnh báo món tại chi nhánh</h3>
+            <p>${escapeHtml(itemName)} · ${escapeHtml(branchName)}</p>
+          </div>
+        </div>
+
+        <div class="menu-warning-body">
+          <div class="menu-warning-status">${escapeHtml(alertLabel)}</div>
+          ${note ? `<div class="menu-warning-line"><span>Ghi chú</span><strong>${escapeHtml(note)}</strong></div>` : ''}
+          ${updatedBy ? `<div class="menu-warning-line"><span>Cập nhật bởi</span><strong>${escapeHtml(updatedBy)}</strong></div>` : ''}
+        </div>
+
+        <div class="menu-warning-message">
+          Món này đang có cảnh báo. Bạn vẫn muốn tiếp tục chọn món?
+        </div>
+
+        <div class="menu-warning-actions">
+          <button type="button" class="btn-secondary" data-warning-cancel>Hủy</button>
+          <button type="button" class="btn-primary" data-warning-confirm>Vẫn chọn món</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => {
+      modal.remove();
+    };
+
+    const escHandler = (event) => {
+      if (event.key === 'Escape') {
+        close();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal || event.target.closest('[data-warning-cancel]')) {
+        close();
+        document.removeEventListener('keydown', escHandler);
+        return;
+      }
+
+      if (event.target.closest('[data-warning-confirm]')) {
+        close();
+        document.removeEventListener('keydown', escHandler);
+        if (typeof onConfirm === 'function') onConfirm();
+      }
+    });
   }
 
   function openEditor(card) {
