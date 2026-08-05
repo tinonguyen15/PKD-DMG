@@ -1,3 +1,5 @@
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/profile-personal-menu.css')) ?>">
+
 <section class="panel">
   <div class="section-head">
     <h2>Cài đặt cá nhân</h2>
@@ -33,3 +35,5 @@
     <button class="btn primary" type="submit">Lưu cài đặt cá nhân</button>
   </form>
 </section>
+
+<script src="<?= e(asset_url('/assets/js/profile-personal-menu.js')) ?>"></script>
