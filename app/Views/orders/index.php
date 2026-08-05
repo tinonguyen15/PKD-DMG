@@ -1,3 +1,5 @@
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/order-kanban.css')) ?>">
+
 <form class="panel filter-grid" method="get" action="<?= e(url('/orders')) ?>">
   <div class="section-head wide">
     <h2>Đơn hàng</h2>
@@ -95,3 +97,5 @@
     </div>
   <?php endforeach; ?>
 </section>
+
+<script src="<?= e(asset_url('/assets/js/order-kanban.js')) ?>"></script>
