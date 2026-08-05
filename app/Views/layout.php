@@ -7,6 +7,7 @@
   <title><?= e($title ?? config('app.name')) ?> - <?= e(config('app.name')) ?></title>
   <link rel="stylesheet" href="<?= e(asset_url('/assets/css/app.css')) ?>">
   <link rel="stylesheet" href="<?= e(asset_url('/assets/css/sidebar.css')) ?>">
+  <link rel="stylesheet" href="<?= e(asset_url('/assets/css/sidebar-compact.css')) ?>">
   <link rel="stylesheet" href="<?= e(asset_url('/assets/css/brand-assets.css')) ?>">
   <link rel="stylesheet" href="<?= e(asset_url('/assets/css/info-pages.css')) ?>">
   <?php if (($title ?? '') === 'Tạo đơn'): ?>
