@@ -318,7 +318,7 @@ class OrderController extends Controller
                 return $aRecent ? -1 : 1;
             }
             if ($aRecent && $bRecent) {
-                return $recentRank[$aId] <=> $bRecent[$bId];
+                return $recentRank[$aId] <=> $recentRank[$bId];
             }
 
             return ((int) ($a['_original_index'] ?? 0)) <=> ((int) ($b['_original_index'] ?? 0));
