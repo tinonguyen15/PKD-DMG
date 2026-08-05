@@ -22,6 +22,10 @@ class OrderController extends Controller
         $recentItemIds = !empty($preferences['show_recent_menu_items_first'])
             ? OrderModel::recentMenuItemIds($userId)
             : [];
+        $activeOrders = array_values(array_filter(
+            OrderModel::all(),
+            static fn(array $order): bool => in_array((string) ($order['workflow_status'] ?? ''), ['processing', 'sent'], true)
+        ));
 
         $this->view('orders/create', [
             'title' => 'Tạo đơn',
@@ -35,6 +39,9 @@ class OrderController extends Controller
             'favoriteItemIds' => $favoriteItemIds,
             'recentItemIds' => $recentItemIds,
             'drafts' => OrderDraftModel::forUser($userId),
+            'activeOrders' => $activeOrders,
+            'workflowLabels' => OrderModel::WORKFLOW_LABELS,
+            'typeLabels' => OrderModel::TYPE_LABELS,
             'old' => \flash('old') ?: [],
             'errors' => \flash('errors') ?: [],
         ]);
@@ -43,6 +50,7 @@ class OrderController extends Controller
     public function store(): void
     {
         $orderType = $this->orderType((string) \input('order_type', 'delivery'));
+        $submitStatus = $this->submitStatus((string) \input('submit_status', 'processing'));
         $items = $orderType === 'booking'
             ? []
             : OrderModel::prepareItems($_POST['items'] ?? [], $_POST['item_notes'] ?? []);
@@ -78,12 +86,27 @@ class OrderController extends Controller
         ];
 
         $orderId = OrderModel::create($data, $items);
+        if ($submitStatus !== 'processing') {
+            OrderModel::updateStatus($orderId, $submitStatus);
+        }
+
         CustomerModel::touchFromOrder($data, $orderId);
         ContactModel::touchFromOrder($data);
         OrderDraftModel::deleteForUser((int) \input('draft_id', 0), (int) \current_user()['id']);
         PreferenceModel::rememberLastOrderChoices((int) \current_user()['id'], $data);
-        \flash('success', 'Đã lưu đơn mới.');
-        \redirect('/orders/' . $orderId);
+
+        if ($submitStatus === 'completed') {
+            \flash('success', 'Đã hoàn thành đơn.');
+            \redirect('/orders?workflow_status=completed');
+        }
+
+        if ($submitStatus === 'sent') {
+            \flash('success', 'Đã copy gửi CN và chuyển đơn sang Đã gửi CN.');
+            \redirect('/orders/create');
+        }
+
+        \flash('success', 'Đã lưu đơn đang xử lý.');
+        \redirect('/orders/create');
     }
 
     public function index(): void
@@ -308,6 +331,11 @@ class OrderController extends Controller
     private function orderType(string $type): string
     {
         return array_key_exists($type, OrderModel::TYPE_LABELS) ? $type : 'delivery';
+    }
+
+    private function submitStatus(string $status): string
+    {
+        return in_array($status, ['processing', 'sent', 'completed'], true) ? $status : 'processing';
     }
 
     private function findById(array $rows, int $id): ?array
