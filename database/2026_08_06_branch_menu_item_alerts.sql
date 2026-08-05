@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS branch_menu_item_alerts (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  branch_id INT UNSIGNED NOT NULL,
+  menu_item_id INT UNSIGNED NOT NULL,
+  status ENUM('paused', 'out') NOT NULL DEFAULT 'paused',
+  paused_until DATETIME NULL,
+  note VARCHAR(255) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_branch_menu_item_alert (branch_id, menu_item_id),
+  INDEX idx_branch_menu_alert_branch (branch_id, active),
+  INDEX idx_branch_menu_alert_item (menu_item_id, active),
+  INDEX idx_branch_menu_alert_until (paused_until),
+  CONSTRAINT fk_branch_menu_alert_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+  CONSTRAINT fk_branch_menu_alert_item FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE,
+  CONSTRAINT fk_branch_menu_alert_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_branch_menu_alert_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
