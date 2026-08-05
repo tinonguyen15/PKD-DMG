@@ -1,0 +1,229 @@
+/* Compact horizontal menu cards for order create */
+[data-order-create] .menu-grid {
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+[data-order-create] .menu-card {
+  position: relative !important;
+  grid-template-columns: 112px minmax(0, 1fr) minmax(142px, auto) !important;
+  grid-template-rows: minmax(100px, auto) auto !important;
+  align-items: center !important;
+  column-gap: 18px !important;
+  row-gap: 10px !important;
+  min-height: 156px !important;
+  padding: 20px 16px 16px 18px !important;
+  border: 2px solid #dff3ea !important;
+  border-radius: 24px !important;
+  background: #fff !important;
+  overflow: visible !important;
+}
+
+[data-order-create] .menu-card:hover {
+  border-color: #9fd8bd !important;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, .08) !important;
+  transform: translateY(-1px) !important;
+}
+
+[data-order-create] .menu-card.is-card-picked {
+  border-color: #22c55e !important;
+  background: #f6fff9 !important;
+}
+
+[data-order-create] .dish-thumb {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 92px !important;
+  height: 92px !important;
+  border-radius: 22px !important;
+  align-self: center !important;
+  justify-self: center !important;
+  overflow: hidden !important;
+}
+
+[data-order-create] .dish-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+[data-order-create] .dish-info {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  min-width: 0 !important;
+  padding-right: 54px !important;
+}
+
+[data-order-create] .dish-info strong {
+  color: #101828 !important;
+  font-size: 20px !important;
+  line-height: 1.18 !important;
+  letter-spacing: -.03em !important;
+  white-space: normal !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+}
+
+[data-order-create] .dish-info span {
+  display: block !important;
+  margin-top: 7px !important;
+  color: #667085 !important;
+  font-size: 18px !important;
+  line-height: 1.15 !important;
+  font-weight: 700 !important;
+}
+
+[data-order-create] .dish-info .item-badge {
+  display: inline-flex !important;
+  width: fit-content !important;
+  margin-top: 8px !important;
+  padding: 3px 9px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+}
+
+[data-order-create] .qty-control {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  align-self: end !important;
+  justify-self: end !important;
+  display: grid !important;
+  grid-template-columns: 64px 88px !important;
+  gap: 10px !important;
+  margin-top: 34px !important;
+}
+
+[data-order-create] .qty-control [data-qty-step="1"] {
+  display: none !important;
+}
+
+[data-order-create] .qty-control [data-qty-step="-1"],
+[data-order-create] .qty-input {
+  min-height: 62px !important;
+  height: 62px !important;
+  border-radius: 22px !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+}
+
+[data-order-create] .qty-control [data-qty-step="-1"] {
+  background: #f9fafb !important;
+  color: #047857 !important;
+}
+
+[data-order-create] .qty-input {
+  text-align: center !important;
+  background: #fff !important;
+}
+
+[data-order-create] .menu-card .menu-alert-tools {
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  z-index: 5 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 5px !important;
+  margin: 0 !important;
+  max-width: 170px !important;
+}
+
+[data-order-create] .menu-card .menu-alert-btn {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  border-radius: 999px !important;
+  border: 2px solid #d0d5dd !important;
+  background: rgba(255,255,255,.96) !important;
+  color: #667085 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .06) !important;
+}
+
+[data-order-create] .menu-card .menu-alert-btn::before {
+  font-size: 20px !important;
+}
+
+[data-order-create] .menu-card .menu-alert-badge:not(.is-hidden) {
+  max-width: 112px !important;
+  min-height: 22px !important;
+  padding: 3px 8px !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .06) !important;
+}
+
+[data-order-create] .item-note-row {
+  display: none !important;
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+  margin-top: 2px !important;
+  padding-top: 10px !important;
+  border-top: 1px dashed #edf0ec !important;
+}
+
+[data-order-create] .menu-card.is-note-open .item-note-row,
+[data-order-create] .menu-card.has-note .item-note-row,
+[data-order-create] .menu-card:focus-within .item-note-row {
+  display: grid !important;
+}
+
+[data-order-create] .item-note-row input {
+  min-height: 42px !important;
+  border-radius: 14px !important;
+}
+
+@media (max-width: 760px) {
+  [data-order-create] .menu-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  [data-order-create] .menu-card {
+    grid-template-columns: 82px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    min-height: 138px !important;
+    padding: 18px 14px 14px !important;
+  }
+
+  [data-order-create] .dish-thumb {
+    width: 72px !important;
+    height: 72px !important;
+    border-radius: 18px !important;
+  }
+
+  [data-order-create] .dish-info {
+    grid-column: 2 !important;
+    padding-right: 52px !important;
+  }
+
+  [data-order-create] .dish-info strong {
+    font-size: 17px !important;
+  }
+
+  [data-order-create] .dish-info span {
+    font-size: 15px !important;
+  }
+
+  [data-order-create] .qty-control {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    justify-self: end !important;
+    margin-top: 2px !important;
+    grid-template-columns: 58px 78px !important;
+  }
+
+  [data-order-create] .qty-control [data-qty-step="-1"],
+  [data-order-create] .qty-input {
+    min-height: 54px !important;
+    height: 54px !important;
+    border-radius: 18px !important;
+    font-size: 20px !important;
+  }
+
+  [data-order-create] .item-note-row {
+    grid-row: 3 !important;
+  }
+}
