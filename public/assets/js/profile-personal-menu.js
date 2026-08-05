@@ -10,5 +10,6 @@
     });
   }
 
+  hideLegacyMenuBlock();
   document.addEventListener('DOMContentLoaded', hideLegacyMenuBlock);
 })();
