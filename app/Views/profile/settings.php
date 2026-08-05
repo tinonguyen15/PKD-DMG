@@ -1,4 +1,5 @@
 <link rel="stylesheet" href="<?= e(asset_url('/assets/css/profile-personal-menu.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/info-pages.css')) ?>">
 
 <section class="panel">
   <div class="section-head">
@@ -30,6 +31,7 @@
     $preferenceDisableLocked = true;
     $preferenceLockControls = false;
     require dirname(__DIR__) . '/partials/preference_fields.php';
+    require __DIR__ . '/custom_info_tabs.php';
     require __DIR__ . '/personal_menu_settings.php';
     ?>
     <div class="profile-autosave-footer">
