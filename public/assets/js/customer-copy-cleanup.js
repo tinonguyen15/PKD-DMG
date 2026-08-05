@@ -28,13 +28,30 @@
     navigator.clipboard.__customerCopyCleanupPatched = true;
   }
 
+  function loadMenuAlerts() {
+    if (!document.querySelector('[data-order-create]') || document.querySelector('[data-menu-alerts-script]')) {
+      return;
+    }
+
+    const version = document.querySelector('meta[name="app-version"]')?.content || 'dev';
+    const script = document.createElement('script');
+    script.src = `/assets/js/menu-alerts.js?v=${encodeURIComponent(version)}`;
+    script.defer = true;
+    script.dataset.menuAlertsScript = '1';
+    document.body.appendChild(script);
+  }
+
   function queueClean() {
     window.requestAnimationFrame(cleanCustomerCopyFields);
   }
 
   patchClipboard();
   cleanCustomerCopyFields();
-  document.addEventListener('DOMContentLoaded', cleanCustomerCopyFields);
+  loadMenuAlerts();
+  document.addEventListener('DOMContentLoaded', () => {
+    cleanCustomerCopyFields();
+    loadMenuAlerts();
+  });
   document.addEventListener('input', queueClean, true);
   document.addEventListener('change', queueClean, true);
   document.addEventListener('click', queueClean, true);
