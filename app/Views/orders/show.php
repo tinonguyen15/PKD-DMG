@@ -1,3 +1,8 @@
+<?php
+$customer = $customerProfile['customer'] ?? null;
+$isBlacklisted = !empty($customer['is_blacklisted']);
+?>
+
 <section class="content-grid two">
   <article class="panel">
     <div class="section-head">
@@ -49,6 +54,27 @@
     </div>
     <textarea id="customer-copy" class="copy-box" readonly><?= e($customerText) ?></textarea>
   </article>
+</section>
+
+<section class="panel customer-flag-panel <?= $isBlacklisted ? 'is-danger' : '' ?>">
+  <div class="section-head">
+    <div>
+      <h2><?= $isBlacklisted ? 'Khách đang trong blacklist' : 'Đánh dấu blacklist' ?></h2>
+      <p class="muted small"><?= $isBlacklisted ? e($customer['blacklist_reason'] ?: 'Chưa ghi lý do.') : 'Gắn SĐT này vào danh sách cảnh báo của sale.' ?></p>
+    </div>
+    <a class="btn ghost" href="<?= e(url('/customers/blacklist')) ?>">Xem blacklist</a>
+  </div>
+  <form class="customer-flag-form" method="post" action="<?= e(url('/orders/' . $order['id'] . '/blacklist')) ?>">
+    <?= csrf_field() ?>
+    <?php if ($isBlacklisted): ?>
+      <input type="hidden" name="is_blacklisted" value="0">
+      <button class="btn ghost" type="submit">Gỡ blacklist</button>
+    <?php else: ?>
+      <input type="hidden" name="is_blacklisted" value="1">
+      <input name="reason" placeholder="Lý do: boom hàng, hủy nhiều lần, không nghe máy" required>
+      <button class="btn danger" type="submit">Thêm blacklist</button>
+    <?php endif; ?>
+  </form>
 </section>
 
 <section class="panel">
