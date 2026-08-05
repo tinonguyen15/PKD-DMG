@@ -169,17 +169,6 @@
             <small>Order nội bộ</small>
           </span>
         </a>
-
-        <div class="sidebar-quick">
-          <a class="quick-create" href="<?= e(url('/orders/create')) ?>">
-            <span>+</span>
-            <strong>Tạo đơn</strong>
-          </a>
-          <div class="quick-row">
-            <a href="<?= e(url('/orders')) ?>">Đơn</a>
-            <a href="<?= e(url('/customers/blacklist')) ?>">Blacklist</a>
-          </div>
-        </div>
       </div>
 
       <nav class="sidebar-nav">
