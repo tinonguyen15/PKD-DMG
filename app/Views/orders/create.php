@@ -5,7 +5,6 @@ $orderPreferences = $orderPreferences ?? [];
 $quickNoticeLabels = $quickNoticeLabels ?? [];
 $selectedQuickNotices = \App\Models\OrderModel::sanitizeQuickNoticeKeys($old['quick_notices'] ?? []);
 $favoriteItemIds = array_map('intval', $favoriteItemIds ?? []);
-$recentItemIds = array_map('intval', $recentItemIds ?? []);
 $drafts = $drafts ?? [];
 $activeOrders = $activeOrders ?? [];
 $workflowLabels = $workflowLabels ?? \App\Models\OrderModel::WORKFLOW_LABELS;
@@ -271,11 +270,9 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
           </div>
           <div class="dish-info">
             <strong><?= e($item['name']) ?></strong>
-            <span><?= money((int) $item['price']) ?> / <?= e($item['unit']) ?></span>
+            <span><?= money((int) $item['price']) ?></span>
             <?php if (in_array((int) $item['id'], $favoriteItemIds, true)): ?>
               <em class="item-badge">Ghim</em>
-            <?php elseif (in_array((int) $item['id'], $recentItemIds, true)): ?>
-              <em class="item-badge">Gần đây</em>
             <?php endif; ?>
           </div>
           <div class="qty-control">
