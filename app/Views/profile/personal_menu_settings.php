@@ -3,7 +3,6 @@ $personalMenu = $personalMenu ?? \App\Models\PersonalMenuModel::DEFAULTS;
 $personalItems = is_array($personalMenu['personal_menu_items'] ?? null) ? $personalMenu['personal_menu_items'] : [];
 $showFavorites = !empty($personalMenu['personal_menu_show_favorites']);
 $favoriteMenuItemIds = array_map('intval', (array) ($preferenceValues['favorite_menu_item_ids'] ?? []));
-$showRecent = !empty($preferenceValues['show_recent_menu_items_first']);
 $displayItems = array_values($items);
 foreach ($displayItems as $index => &$displayItem) {
     $id = (int) ($displayItem['id'] ?? 0);
@@ -22,7 +21,7 @@ usort($displayItems, static function (array $a, array $b): int {
 <details class="preference-group personal-menu-settings" open data-personal-menu-settings>
   <summary>
     <span>Menu món cá nhân</span>
-    <small>Kéo thả, đổi tên, ảnh, ẩn/hiện, ghim và gần đây cho riêng tài khoản này</small>
+    <small>Kéo thả, đổi tên, ảnh, ẩn/hiện và ghim món cho riêng tài khoản này</small>
   </summary>
   <div class="preference-group-body">
     <p class="preference-hint wide">
@@ -33,10 +32,6 @@ usort($displayItems, static function (array $a, array $b): int {
       <label class="check">
         <input type="checkbox" name="personal_menu_show_favorites" value="1" <?= $showFavorites ? 'checked' : '' ?>>
         Bật khu vực món ghim
-      </label>
-      <label class="check">
-        <input type="checkbox" name="show_recent_menu_items_first" value="1" <?= $showRecent ? 'checked' : '' ?><?= $disabled('show_recent_menu_items_first') ?>>
-        Bật món gần đây
       </label>
       <span class="autosave-status" data-profile-autosave-status>Đã sẵn sàng tự lưu</span>
     </div>
