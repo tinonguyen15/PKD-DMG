@@ -17,6 +17,8 @@ $statusLabel = static function (?string $status): string {
 };
 ?>
 
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-blacklist.css')) ?>">
+
 <section class="blacklist-page">
   <div class="blacklist-head panel">
     <div>
@@ -73,9 +75,7 @@ $statusLabel = static function (?string $status): string {
                 <small><?= e($row['phone_display'] ?: $row['phone_normalized']) ?></small>
                 <?php if (!empty($row['address'])): ?><em><?= e($row['address']) ?></em><?php endif; ?>
               </td>
-              <td>
-                <span class="blacklist-reason"><?= e($row['blacklist_reason'] ?: 'Chưa ghi lý do') ?></span>
-              </td>
+              <td><span class="blacklist-reason"><?= e($row['blacklist_reason'] ?: 'Chưa ghi lý do') ?></span></td>
               <td>
                 <?php if (!empty($row['order_code'])): ?>
                   <a class="blacklist-order" href="<?= e(url('/orders/' . (int) $row['blacklisted_order_id'])) ?>">
