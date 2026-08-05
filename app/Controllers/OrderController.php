@@ -181,11 +181,6 @@ class OrderController extends Controller
 
     public function markSentAfterCopy(int $id): void
     {
-        $preferences = PreferenceModel::resolved((int) \current_user()['id']);
-        if (empty($preferences['auto_mark_sent_on_branch_copy'])) {
-            $this->json(['changed' => false, 'reason' => 'disabled']);
-        }
-
         $order = OrderModel::find($id);
         if (!$order) {
             $this->json(['changed' => false, 'message' => 'Không tìm thấy đơn.'], 404);
