@@ -78,11 +78,8 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
 
 <section class="panel active-orders-panel">
   <div class="section-head">
-    <div>
-      <h2>Đơn đang mở</h2>
-      <p class="muted small">Đơn ở Đang xử lý / Đã gửi CN sẽ nằm ở đây và vẫn nằm trong trang Đơn hàng.</p>
-    </div>
-    <a class="btn ghost" href="<?= e(url('/orders')) ?>">Xem tất cả</a>
+    <h2>Đơn đang mở</h2>
+    <a class="btn ghost" href="<?= e(url('/orders')) ?>">Đơn hàng</a>
   </div>
   <div class="active-orders-grid">
     <?php foreach (['processing' => 'Đang xử lý', 'sent' => 'Đã gửi CN'] as $status => $label): ?>
