@@ -37,6 +37,14 @@ class ProfileController extends Controller
         PreferenceModel::saveUser((int) $targetUser['id'], $_POST);
         PersonalMenuModel::saveUser((int) $targetUser['id'], $_POST);
 
+        if ($this->wantsJson()) {
+            $this->json([
+                'saved' => true,
+                'message' => 'Đã tự lưu cài đặt cá nhân.',
+                'target_user_id' => (int) $targetUser['id'],
+            ]);
+        }
+
         \flash('success', 'Đã lưu cài đặt cá nhân.');
         $suffix = \is_admin() ? '?user_id=' . (int) $targetUser['id'] : '';
         \redirect('/profile/settings' . $suffix);
@@ -57,5 +65,13 @@ class ProfileController extends Controller
         }
 
         return $current ?: ['id' => 0, 'employee_code' => '', 'name' => '', 'role' => 'staff'];
+    }
+
+    private function wantsJson(): bool
+    {
+        $requestedWith = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+
+        return $requestedWith === 'xmlhttprequest' || str_contains($accept, 'application/json');
     }
 }
