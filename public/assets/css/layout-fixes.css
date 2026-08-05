@@ -52,3 +52,17 @@
 @media(max-width:1180px){
   body.page-order-create{height:auto!important;overflow:auto!important}.sidebar{max-height:none}.main{min-height:100dvh}.order-create-hero{display:none!important}.order-layout{height:auto!important;max-height:none!important;overflow:visible!important;padding-right:0!important}.cart-panel{position:static!important;width:auto!important;height:auto!important;max-height:none!important;overflow:visible!important}.menu-grid{max-height:none!important;overflow:visible!important}
 }
+
+/* Font weight polish: override global font: inherit without changing font family */
+button,input,select,textarea{font-family:inherit!important;font-size:inherit;line-height:inherit;font-weight:500!important}
+input::placeholder,textarea::placeholder{font-weight:400;color:#8a938b}
+label,.source-row>span,.item-note-row,.order-info-grid label{font-weight:600!important}
+.btn,.segmented span,.chip-select span,.chip,.quick-create,.quick-row a,.qty-control button{font-weight:600!important}
+.btn.primary,.btn.danger,.primary-actions .btn.primary,.quick-create strong,.cart-panel [data-order-total],.qty-input{font-weight:700!important}
+.copy-box,textarea.copy-box{font-weight:400!important}
+.dish-info strong,.draft-chip strong,.customer-order-main b,.blacklist-table td:first-child strong,.blacklist-table td:nth-child(4) strong{font-weight:600!important}
+body.page-order-create input,body.page-order-create select,body.page-order-create textarea{font-weight:500!important}
+body.page-order-create .order-info-grid label,body.page-order-create .source-row>span{font-weight:600!important}
+body.page-order-create .segmented span,body.page-order-create .chip-select span,body.page-order-create .chip,body.page-order-create .primary-actions .btn.ghost{font-weight:600!important}
+body.page-order-create .primary-actions .btn.primary{font-weight:700!important}
+body.page-order-create .dish-info strong{font-weight:600!important}
