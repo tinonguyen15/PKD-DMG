@@ -12,6 +12,9 @@
     <link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-insights.css')) ?>">
     <link rel="stylesheet" href="<?= e(asset_url('/assets/css/order-create.css')) ?>">
   <?php endif; ?>
+  <?php if (($title ?? '') === 'Blacklist'): ?>
+    <link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-blacklist.css')) ?>">
+  <?php endif; ?>
   <link rel="stylesheet" href="<?= e(asset_url('/assets/css/layout-fixes.css')) ?>">
 </head>
 <body class="<?= e(($title ?? '') === 'Tạo đơn' ? 'page-order-create' : '') ?>">
@@ -93,35 +96,26 @@
 
     $navGroups = [
         [
-            'label' => 'Vận hành',
+            'label' => 'Menu',
             'items' => [
-                ['href' => '/', 'icon' => '⌂', 'label' => 'Tổng quan', 'desc' => 'Bảng điều khiển', 'active' => $isNavActive('/', false)],
-                ['href' => '/orders/create', 'icon' => '+', 'label' => 'Tạo đơn', 'desc' => 'Lên đơn nhanh', 'active' => $isNavActive('/orders/create')],
-                ['href' => '/orders', 'icon' => '▦', 'label' => 'Đơn hàng', 'desc' => 'Kanban trạng thái', 'active' => $isNavActive('/orders', true, ['/orders/create'])],
-                ['href' => '/contacts', 'icon' => '☏', 'label' => 'Tiếp nhận', 'desc' => 'Kênh & chi nhánh', 'active' => $isNavActive('/contacts')],
+                ['href' => '/orders/create', 'icon' => '+', 'label' => 'Tạo đơn', 'desc' => '', 'active' => $isNavActive('/orders/create')],
+                ['href' => '/orders', 'icon' => '▦', 'label' => 'Đơn hàng', 'desc' => '', 'active' => $isNavActive('/orders', true, ['/orders/create'])],
+                ['href' => '/contacts', 'icon' => '☏', 'label' => 'Tiếp nhận', 'desc' => '', 'active' => $isNavActive('/contacts')],
+                ['href' => '/customers/blacklist', 'icon' => '!', 'label' => 'Blacklist', 'desc' => '', 'active' => $isNavActive('/customers/blacklist')],
+                ['href' => '/reports', 'icon' => '◴', 'label' => 'Báo cáo', 'desc' => '', 'active' => $isNavActive('/reports')],
             ],
         ],
         [
-            'label' => 'Phân tích',
+            'label' => 'Khác',
             'items' => [
-                ['href' => '/reports', 'icon' => '◴', 'label' => 'Báo cáo', 'desc' => 'Doanh thu & hiệu suất', 'active' => $isNavActive('/reports')],
-            ],
-        ],
-        [
-            'label' => 'Tài khoản',
-            'items' => [
-                ['href' => '/profile/settings', 'icon' => '⚙', 'label' => 'Cài đặt cá nhân', 'desc' => 'Mẫu copy & mặc định', 'active' => $isNavActive('/profile/settings')],
+                ['href' => '/', 'icon' => '⌂', 'label' => 'Tổng quan', 'desc' => '', 'active' => $isNavActive('/', false)],
+                ['href' => '/profile/settings', 'icon' => '⚙', 'label' => 'Cá nhân', 'desc' => '', 'active' => $isNavActive('/profile/settings')],
             ],
         ],
     ];
 
     if (is_admin()) {
-        $navGroups[] = [
-            'label' => 'Quản trị',
-            'items' => [
-                ['href' => '/settings', 'icon' => '✦', 'label' => 'Cài đặt hệ thống', 'desc' => 'Menu, CN, user, nguồn', 'active' => $isNavActive('/settings')],
-            ],
-        ];
+        $navGroups[1]['items'][] = ['href' => '/settings', 'icon' => '✦', 'label' => 'Cài đặt', 'desc' => '', 'active' => $isNavActive('/settings')];
     }
 
     $roleLabel = strtoupper((string) ($user['role'] ?? ''));
@@ -148,11 +142,11 @@
         <div class="sidebar-quick">
           <a class="quick-create" href="<?= e(url('/orders/create')) ?>">
             <span>+</span>
-            <strong>Tạo đơn mới</strong>
+            <strong>Tạo đơn</strong>
           </a>
           <div class="quick-row">
-            <a href="<?= e(url('/orders')) ?>">Đơn hàng</a>
-            <a href="<?= e(url('/contacts')) ?>">Tiếp nhận</a>
+            <a href="<?= e(url('/orders')) ?>">Đơn</a>
+            <a href="<?= e(url('/customers/blacklist')) ?>">Blacklist</a>
           </div>
         </div>
       </div>
@@ -170,7 +164,9 @@
                 <span class="nav-icon" aria-hidden="true"><?= e($item['icon']) ?></span>
                 <span class="nav-copy">
                   <strong><?= e($item['label']) ?></strong>
-                  <small><?= e($item['desc']) ?></small>
+                  <?php if (!empty($item['desc'])): ?>
+                    <small><?= e($item['desc']) ?></small>
+                  <?php endif; ?>
                 </span>
               </a>
             <?php endforeach; ?>
