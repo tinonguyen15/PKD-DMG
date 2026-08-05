@@ -54,21 +54,6 @@ $selectedPaymentCandidate = (int) ($old['payment_method_id'] ?? $defaultPaymentI
 $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?: $defaultPaymentId($selectedType);
 ?>
 
-<link rel="stylesheet" href="<?= e(url('/assets/css/customer-insights.css?v=20260805-2')) ?>">
-<link rel="stylesheet" href="<?= e(url('/assets/css/order-create.css?v=20260805-1')) ?>">
-
-<header class="order-create-hero">
-  <div class="order-create-hero__copy">
-    <span>Lên đơn nhanh</span>
-    <h1>Tạo đơn hàng mới</h1>
-    <p>Nhập thông tin khách, kiểm tra lịch sử theo SĐT, chọn món và copy nội dung gửi chi nhánh trong cùng một màn hình.</p>
-  </div>
-  <div class="order-create-hero__actions">
-    <a class="btn ghost" href="<?= e(url('/orders')) ?>">Xem đơn hàng</a>
-    <button class="btn primary" type="button" data-new-draft>Thêm đơn mới</button>
-  </div>
-</header>
-
 <?php if ($errors): ?>
   <div class="alert danger">
     <?php foreach ($errors as $message): ?><div><?= e($message) ?></div><?php endforeach; ?>
@@ -268,4 +253,3 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
     </div>
   </aside>
 </form>
-<script src="<?= e(url('/assets/js/customer-insights.js?v=20260805-2')) ?>"></script>
