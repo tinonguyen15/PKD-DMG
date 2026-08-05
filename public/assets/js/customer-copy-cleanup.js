@@ -28,14 +28,29 @@
     navigator.clipboard.__customerCopyCleanupPatched = true;
   }
 
+  function appVersion() {
+    return document.querySelector('meta[name="app-version"]')?.content || 'dev';
+  }
+
+  function loadMenuCardRedesign() {
+    if (!document.querySelector('[data-order-create]') || document.querySelector('[data-menu-card-redesign-css]')) {
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/assets/css/menu-card-redesign.css?v=${encodeURIComponent(appVersion())}`;
+    link.dataset.menuCardRedesignCss = '1';
+    document.head.appendChild(link);
+  }
+
   function loadMenuAlerts() {
     if (!document.querySelector('[data-order-create]') || document.querySelector('[data-menu-alerts-script]')) {
       return;
     }
 
-    const version = document.querySelector('meta[name="app-version"]')?.content || 'dev';
     const script = document.createElement('script');
-    script.src = `/assets/js/menu-alerts.js?v=${encodeURIComponent(version)}`;
+    script.src = `/assets/js/menu-alerts.js?v=${encodeURIComponent(appVersion())}`;
     script.defer = true;
     script.dataset.menuAlertsScript = '1';
     document.body.appendChild(script);
@@ -47,9 +62,11 @@
 
   patchClipboard();
   cleanCustomerCopyFields();
+  loadMenuCardRedesign();
   loadMenuAlerts();
   document.addEventListener('DOMContentLoaded', () => {
     cleanCustomerCopyFields();
+    loadMenuCardRedesign();
     loadMenuAlerts();
   });
   document.addEventListener('input', queueClean, true);
