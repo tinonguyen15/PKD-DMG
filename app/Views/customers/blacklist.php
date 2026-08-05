@@ -1,7 +1,7 @@
 <?php
 $filters = $filters ?? [];
 $rows = $rows ?? [];
-$stats = $stats ?? ['total' => 0, 'last_7_days' => 0, 'last_30_days' => 0];
+$stats = $stats ?? ['total' => 0, 'active_entries' => 0, 'last_7_days' => 0, 'last_30_days' => 0];
 $fmtDate = static function (?string $value): string {
     if (!$value) return '-';
     $time = strtotime($value);
@@ -17,14 +17,12 @@ $statusLabel = static function (?string $status): string {
 };
 ?>
 
-<link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-blacklist.css')) ?>">
-
-<section class="blacklist-page">
+<section class="blacklist-page blacklist-page-v2">
   <div class="blacklist-head panel">
     <div>
       <span>CRM khách hàng</span>
       <h1>Blacklist</h1>
-      <p>Danh sách SĐT cần kiểm tra kỹ trước khi nhận đơn.</p>
+      <p>Gom theo SĐT. Mỗi dòng bên trong là một đơn bị ghi nhận blacklist.</p>
     </div>
     <form class="blacklist-search" method="get" action="<?= e(url('/customers/blacklist')) ?>">
       <input name="q" value="<?= e($filters['q'] ?? '') ?>" placeholder="Tìm SĐT, tên, mã đơn, lý do">
@@ -37,68 +35,74 @@ $statusLabel = static function (?string $status): string {
 
   <div class="metric-grid blacklist-metrics">
     <article class="panel metric-card">
-      <div class="metric-title"><span>Đang blacklist</span><small>Tổng số khách</small></div>
-      <b><?= (int) $stats['total'] ?></b>
+      <div class="metric-title"><span>SĐT cảnh báo</span><small>Đang blacklist</small></div>
+      <b><?= (int) ($stats['total'] ?? 0) ?></b>
+    </article>
+    <article class="panel metric-card">
+      <div class="metric-title"><span>Đơn blacklist</span><small>Tổng lượt đang hiệu lực</small></div>
+      <b><?= (int) ($stats['active_entries'] ?? 0) ?></b>
     </article>
     <article class="panel metric-card">
       <div class="metric-title"><span>7 ngày</span><small>Mới thêm</small></div>
-      <b><?= (int) $stats['last_7_days'] ?></b>
-    </article>
-    <article class="panel metric-card">
-      <div class="metric-title"><span>30 ngày</span><small>Mới thêm</small></div>
-      <b><?= (int) $stats['last_30_days'] ?></b>
+      <b><?= (int) ($stats['last_7_days'] ?? 0) ?></b>
     </article>
   </div>
 
   <section class="panel blacklist-table-panel">
     <div class="section-head">
-      <h2>Danh sách khách blacklist</h2>
-      <strong><?= count($rows) ?> khách</strong>
+      <h2>Danh sách blacklist</h2>
+      <strong><?= count($rows) ?> SĐT</strong>
     </div>
 
-    <div class="table-wrap">
-      <table class="blacklist-table">
-        <thead>
-          <tr>
-            <th>Khách</th>
-            <th>Lý do</th>
-            <th>Đơn liên quan</th>
-            <th>Người thêm</th>
-            <th>Ngày thêm</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($rows as $row): ?>
-            <tr>
-              <td>
-                <strong><?= e($row['name'] ?: $row['order_customer_name'] ?: 'Chưa có tên') ?></strong>
-                <small><?= e($row['phone_display'] ?: $row['phone_normalized']) ?></small>
-                <?php if (!empty($row['address'])): ?><em><?= e($row['address']) ?></em><?php endif; ?>
-              </td>
-              <td><span class="blacklist-reason"><?= e($row['blacklist_reason'] ?: 'Chưa ghi lý do') ?></span></td>
-              <td>
-                <?php if (!empty($row['order_code'])): ?>
-                  <a class="blacklist-order" href="<?= e(url('/orders/' . (int) $row['blacklisted_order_id'])) ?>">
-                    <strong><?= e($row['order_code']) ?></strong>
-                    <small><?= e($row['order_branch_name'] ?: 'Chưa CN') ?> · <?= e($row['order_source_name'] ?: 'Chưa nguồn') ?></small>
-                    <small><?= e($statusLabel($row['order_status'] ?? '')) ?> · <?= money((int) ($row['order_total'] ?? 0)) ?></small>
-                  </a>
-                <?php else: ?>
-                  <span class="muted">Không gắn đơn</span>
-                <?php endif; ?>
-              </td>
-              <td>
-                <strong><?= e($row['blacklisted_by_name'] ?: 'Không rõ') ?></strong>
-                <?php if (!empty($row['blacklisted_by_code'])): ?><small><?= e($row['blacklisted_by_code']) ?></small><?php endif; ?>
-              </td>
-              <td><?= e($fmtDate($row['blacklisted_at'] ?? $row['updated_at'] ?? null)) ?></td>
-            </tr>
-          <?php endforeach; ?>
-          <?php if (!$rows): ?>
-            <tr><td colspan="5" class="empty">Chưa có khách nào trong blacklist.</td></tr>
-          <?php endif; ?>
-        </tbody>
-      </table>
+    <div class="blacklist-card-list">
+      <?php foreach ($rows as $row): ?>
+        <?php $events = $row['events'] ?? []; ?>
+        <details class="blacklist-customer-card" <?= count($rows) === 1 ? 'open' : '' ?>>
+          <summary>
+            <span class="blacklist-customer-main">
+              <strong><?= e($row['name'] ?: 'Chưa có tên') ?></strong>
+              <small><?= e($row['phone_display'] ?: $row['phone_normalized']) ?><?= !empty($row['address']) ? ' · ' . e($row['address']) : '' ?></small>
+            </span>
+            <span class="blacklist-count-pill"><?= (int) ($row['active_count'] ?? count($events)) ?> đơn</span>
+            <span class="blacklist-latest-reason"><?= e($row['latest_reason'] ?: 'Chưa ghi lý do') ?></span>
+          </summary>
+
+          <div class="blacklist-event-list">
+            <?php foreach ($events as $event): ?>
+              <article class="blacklist-event-card">
+                <div class="blacklist-event-top">
+                  <div>
+                    <?php if (!empty($event['order_id'])): ?>
+                      <a href="<?= e(url('/orders/' . (int) $event['order_id'])) ?>"><strong><?= e($event['order_code'] ?: ('Đơn #' . (int) $event['order_id'])) ?></strong></a>
+                    <?php else: ?>
+                      <strong>Không gắn đơn</strong>
+                    <?php endif; ?>
+                    <small>
+                      <?= e($statusLabel($event['order_status'] ?? '')) ?>
+                      · <?= e($event['order_branch_name'] ?: 'Chưa CN') ?>
+                      · <?= e($event['order_source_name'] ?: 'Chưa nguồn') ?>
+                    </small>
+                  </div>
+                  <b><?= money((int) ($event['order_total'] ?? 0)) ?></b>
+                </div>
+                <div class="blacklist-event-reason">
+                  <span>Lý do</span>
+                  <strong><?= e($event['reason'] ?: 'Chưa ghi lý do') ?></strong>
+                </div>
+                <div class="blacklist-event-meta">
+                  <span>Thêm: <?= e($fmtDate($event['added_at'] ?? null)) ?></span>
+                  <span>Bởi: <?= e($event['added_by_name'] ?: 'Không rõ') ?><?= !empty($event['added_by_code']) ? ' · ' . e($event['added_by_code']) : '' ?></span>
+                  <?php if (!empty($event['order_created_at'])): ?><span>Ngày đơn: <?= e($fmtDate($event['order_created_at'])) ?></span><?php endif; ?>
+                </div>
+              </article>
+            <?php endforeach; ?>
+          </div>
+        </details>
+      <?php endforeach; ?>
+
+      <?php if (!$rows): ?>
+        <div class="empty">Chưa có khách nào trong blacklist.</div>
+      <?php endif; ?>
     </div>
   </section>
 </section>
