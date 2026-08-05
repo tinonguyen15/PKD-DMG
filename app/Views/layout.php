@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="<?= e(asset_url('/assets/css/app.css')) ?>">
   <link rel="stylesheet" href="<?= e(asset_url('/assets/css/sidebar.css')) ?>">
   <link rel="stylesheet" href="<?= e(asset_url('/assets/css/brand-assets.css')) ?>">
+  <link rel="stylesheet" href="<?= e(asset_url('/assets/css/info-pages.css')) ?>">
   <?php if (($title ?? '') === 'Tạo đơn'): ?>
     <link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-insights.css')) ?>">
     <link rel="stylesheet" href="<?= e(asset_url('/assets/css/order-create.css')) ?>">
@@ -68,7 +69,8 @@
         ['*logo*.png', '*logo*.webp', '*logo*.jpg', '*logo*.jpeg', '*Logo*.png', '*Logo*.webp', '*LOGO*.png', '*dmg*.png', '*DMG*.png']
     );
 
-    $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
+    $currentUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+    $currentPath = parse_url($currentUri, PHP_URL_PATH) ?: '/';
     $currentPath = '/' . trim($currentPath, '/');
     $currentPath = $currentPath === '/' ? '/' : rtrim($currentPath, '/');
 
@@ -94,6 +96,31 @@
         return $prefix && $path !== '/' && str_starts_with($currentPath, $path . '/');
     };
 
+    $isInfoActive = static function (string $key) use ($currentPath, $currentUri): bool {
+        if ($currentPath !== '/info.php') {
+            return false;
+        }
+        if ($key === 'branches') {
+            return !str_contains($currentUri, 'page=') && !str_contains($currentUri, 'custom=') || str_contains($currentUri, 'page=branches');
+        }
+        return str_contains($currentUri, $key);
+    };
+
+    $infoItems = [
+        ['href' => '/info.php?page=branches', 'icon' => '⌖', 'label' => 'Địa chỉ CN', 'desc' => 'Dùng chung', 'active' => $isInfoActive('branches')],
+        ['href' => '/info.php?page=bank-accounts', 'icon' => '₫', 'label' => 'STK CN', 'desc' => 'Dùng chung', 'active' => $isInfoActive('bank-accounts')],
+        ['href' => '/info.php?page=menu', 'icon' => '☰', 'label' => 'Menu', 'desc' => 'Dùng chung', 'active' => $isInfoActive('menu')],
+    ];
+    foreach (\App\Models\InfoPageModel::sidebarCustomTabs((int) ($user['id'] ?? 0)) as $index => $tab) {
+        $infoItems[] = [
+            'href' => '/info.php?custom=' . $index,
+            'icon' => '•',
+            'label' => $tab['title'],
+            'desc' => 'Riêng của tôi',
+            'active' => $isInfoActive('custom=' . $index),
+        ];
+    }
+
     $navGroups = [
         [
             'label' => 'Menu',
@@ -106,6 +133,10 @@
             ],
         ],
         [
+            'label' => 'Thông tin',
+            'items' => $infoItems,
+        ],
+        [
             'label' => 'Khác',
             'items' => [
                 ['href' => '/', 'icon' => '⌂', 'label' => 'Tổng quan', 'desc' => '', 'active' => $isNavActive('/', false)],
@@ -115,7 +146,7 @@
     ];
 
     if (is_admin()) {
-        $navGroups[1]['items'][] = ['href' => '/settings', 'icon' => '✦', 'label' => 'Cài đặt', 'desc' => '', 'active' => $isNavActive('/settings')];
+        $navGroups[2]['items'][] = ['href' => '/settings', 'icon' => '✦', 'label' => 'Cài đặt', 'desc' => '', 'active' => $isNavActive('/settings')];
     }
 
     $roleLabel = strtoupper((string) ($user['role'] ?? ''));
