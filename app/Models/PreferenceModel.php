@@ -33,7 +33,6 @@ class PreferenceModel
         'default_delivery_payment_method_id' => 0,
         'default_pickup_payment_method_id' => 0,
         'remember_last_order_choices' => false,
-        'show_recent_menu_items_first' => true,
         'favorite_menu_item_ids' => [],
         'default_contact_branch_id' => 0,
         'default_contact_channel' => 'hotline_1900',
@@ -56,7 +55,6 @@ class PreferenceModel
         'copy_branch_tag_require_branch_match',
         'auto_mark_sent_on_branch_copy',
         'remember_last_order_choices',
-        'show_recent_menu_items_first',
     ];
 
     private const INT_KEYS = [
