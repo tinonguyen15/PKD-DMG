@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="app-version" content="<?= e(app_version()) ?>">
   <title><?= e($title ?? config('app.name')) ?></title>
-  <link rel="stylesheet" href="<?= e(url('/assets/css/app.css')) ?>">
-  <link rel="stylesheet" href="<?= e(url('/assets/css/login.css?v=20260805-4')) ?>">
+  <link rel="stylesheet" href="<?= e(asset_url('/assets/css/app.css')) ?>">
+  <link rel="stylesheet" href="<?= e(asset_url('/assets/css/login.css')) ?>">
 </head>
 <body class="auth-body login-auth-body">
   <?= $content ?>
