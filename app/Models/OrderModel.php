@@ -547,11 +547,13 @@ class OrderModel
     {
         $prefix = 'PKD-' . date('ymd') . '-';
         $row = Database::fetch(
-            'SELECT COUNT(*) AS total FROM orders WHERE order_code LIKE ?',
+            'SELECT MAX(CAST(SUBSTRING(order_code, 12) AS UNSIGNED)) AS max_suffix FROM orders WHERE order_code LIKE ?',
             [$prefix . '%']
         );
 
-        return $prefix . str_pad((string) (((int) ($row['total'] ?? 0)) + 1), 3, '0', STR_PAD_LEFT);
+        $nextNumber = ((int) ($row['max_suffix'] ?? 0)) + 1;
+
+        return $prefix . str_pad((string) $nextNumber, 3, '0', STR_PAD_LEFT);
     }
 
     private static function nullableInt(mixed $value): ?int
