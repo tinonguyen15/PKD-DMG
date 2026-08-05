@@ -33,6 +33,25 @@ function url(string $path = ''): string
     return $base . $path;
 }
 
+function app_version(): string
+{
+    return trim((string) config('app.version', 'dev')) ?: 'dev';
+}
+
+function asset_url(string $path, ?string $version = null): string
+{
+    $path = '/' . ltrim($path, '/');
+    $version = trim((string) ($version ?? app_version())) ?: 'dev';
+
+    $assetPath = dirname(__DIR__) . '/public' . $path;
+    if (is_file($assetPath)) {
+        $version .= '-' . filemtime($assetPath);
+    }
+
+    $separator = str_contains($path, '?') ? '&' : '?';
+    return url($path . $separator . 'v=' . rawurlencode($version));
+}
+
 function redirect(string $path): never
 {
     header('Location: ' . safe_redirect_url($path));
