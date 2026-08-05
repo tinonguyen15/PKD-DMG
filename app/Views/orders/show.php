@@ -4,6 +4,7 @@ $blacklist = $customerProfile['blacklist'] ?? ['active_count' => 0, 'events' => 
 $orderBlacklistEntry = $orderBlacklistEntry ?? null;
 $isOrderBlacklisted = !empty($orderBlacklistEntry['active']);
 $blacklistEvents = $blacklist['events'] ?? [];
+$adminUsers = $adminUsers ?? [];
 $fmtDate = static function (?string $value): string {
     if (!$value) return '-';
     $time = strtotime($value);
@@ -22,6 +23,7 @@ $fmtDate = static function (?string $value): string {
     <dl class="detail-grid">
       <div><dt>Khách</dt><dd><?= e($order['customer_name']) ?></dd></div>
       <div><dt>SĐT</dt><dd><?= e($order['phone']) ?></dd></div>
+      <div><dt>Người tạo</dt><dd><?= e(($order['employee_code'] ?? '') . ' - ' . ($order['staff_name'] ?? '')) ?></dd></div>
       <div><dt>Chi nhánh</dt><dd><?= e($order['branch_name'] ?: 'Chưa CN') ?></dd></div>
       <div><dt>Nguồn</dt><dd><?= e($order['source_name'] ?: 'Chưa nguồn') ?></dd></div>
       <div><dt>Loại đơn</dt><dd><?= e($typeLabels[$order['order_type']] ?? $order['order_type']) ?></dd></div>
@@ -65,6 +67,41 @@ $fmtDate = static function (?string $value): string {
     <textarea id="customer-copy" class="copy-box" readonly><?= e($customerText) ?></textarea>
   </article>
 </section>
+
+<?php if (is_admin()): ?>
+<section class="panel admin-order-tools">
+  <div class="section-head">
+    <div>
+      <h2>Quản trị đơn</h2>
+      <p class="muted small">Chỉ admin thấy phần này. Mọi thao tác được ghi vào audit log.</p>
+    </div>
+  </div>
+  <div class="admin-order-grid">
+    <form class="admin-order-form" method="post" action="<?= e(url('/orders/' . $order['id'] . '/reassign')) ?>">
+      <?= csrf_field() ?>
+      <label>Chuyển người tạo đơn
+        <select name="user_id" required>
+          <?php foreach ($adminUsers as $user): ?>
+            <option value="<?= (int) $user['id'] ?>" <?= (int) $order['user_id'] === (int) $user['id'] ? 'selected' : '' ?>>
+              <?= e($user['employee_code'] . ' - ' . $user['name']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <button class="btn primary" type="submit">Chuyển đơn</button>
+    </form>
+
+    <form class="admin-order-form admin-order-delete" method="post" action="<?= e(url('/orders/' . $order['id'] . '/delete')) ?>" onsubmit="return confirm('Xóa đơn <?= e($order['order_code']) ?>? Thao tác này không hoàn tác được.');">
+      <?= csrf_field() ?>
+      <div>
+        <strong>Xóa đơn</strong>
+        <p class="muted small">Dùng cho đơn test/sai. Sau khi xóa sẽ quay về danh sách đơn.</p>
+      </div>
+      <button class="btn danger" type="submit">Xóa đơn</button>
+    </form>
+  </div>
+</section>
+<?php endif; ?>
 
 <section class="panel customer-flag-panel <?= ((int) ($blacklist['active_count'] ?? 0) > 0) ? 'is-danger' : '' ?>">
   <div class="section-head">
