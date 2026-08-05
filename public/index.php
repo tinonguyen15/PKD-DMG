@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 
 use App\Controllers\AuthController;
 use App\Controllers\ContactController;
+use App\Controllers\CustomerController;
 use App\Controllers\DashboardController;
 use App\Controllers\OrderController;
 use App\Controllers\ProfileController;
@@ -42,6 +43,7 @@ try {
         $path === '/' => (new DashboardController())->index(),
         $path === '/profile/settings' && $method === 'GET' => (new ProfileController())->settings(),
         $path === '/profile/settings' && $method === 'POST' => (new ProfileController())->saveSettings(),
+        $path === '/customers/blacklist' && $method === 'GET' => (new CustomerController())->blacklist(),
         $path === '/orders/create' && $method === 'GET' => (new OrderController())->create(),
         $path === '/orders/customer-lookup' && $method === 'GET' => (new OrderController())->customerLookup(),
         $path === '/orders/customer-blacklist' && $method === 'POST' => (new OrderController())->customerBlacklist(),
@@ -52,6 +54,7 @@ try {
         $path === '/orders' && $method === 'POST' => (new OrderController())->store(),
         preg_match('#^/orders/(\d+)$#', $path, $m) && $method === 'GET' => (new OrderController())->show((int) $m[1]),
         preg_match('#^/orders/(\d+)/status$#', $path, $m) && $method === 'POST' => (new OrderController())->status((int) $m[1]),
+        preg_match('#^/orders/(\d+)/blacklist$#', $path, $m) && $method === 'POST' => (new OrderController())->blacklistOrder((int) $m[1]),
         preg_match('#^/orders/(\d+)/copy-sent$#', $path, $m) && $method === 'POST' => (new OrderController())->markSentAfterCopy((int) $m[1]),
         $path === '/contacts' && $method === 'GET' => (new ContactController())->index(),
         $path === '/contacts' && $method === 'POST' => (new ContactController())->store(),
