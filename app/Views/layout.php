@@ -10,7 +10,7 @@
   <?php if (($title ?? '') === 'Tạo đơn'): ?>
     <link rel="stylesheet" href="<?= e(url('/assets/css/customer-insights.css?v=20260805-2')) ?>">
   <?php endif; ?>
-  <link rel="stylesheet" href="<?= e(url('/assets/css/layout-fixes.css?v=20260805-1')) ?>">
+  <link rel="stylesheet" href="<?= e(url('/assets/css/layout-fixes.css?v=20260805-2')) ?>">
 </head>
 <body class="<?= e(($title ?? '') === 'Tạo đơn' ? 'page-order-create' : '') ?>">
   <?php
@@ -203,6 +203,9 @@
   </div>
   <div id="toast-root" class="toast-root"></div>
   <script src="<?= e(url('/assets/js/app.js')) ?>"></script>
+  <?php if (($title ?? '') === 'Tạo đơn'): ?>
+    <script src="<?= e(url('/assets/js/customer-insights.js?v=20260805-2')) ?>"></script>
+  <?php endif; ?>
   <?php if (($title ?? '') === 'Cài đặt'): ?>
     <script src="<?= e(url('/assets/js/settings-autosave.js?v=20260804-4')) ?>"></script>
   <?php endif; ?>
