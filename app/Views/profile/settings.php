@@ -28,6 +28,7 @@
     $preferenceDisableLocked = true;
     $preferenceLockControls = false;
     require dirname(__DIR__) . '/partials/preference_fields.php';
+    require __DIR__ . '/personal_menu_settings.php';
     ?>
     <button class="btn primary" type="submit">Lưu cài đặt cá nhân</button>
   </form>
