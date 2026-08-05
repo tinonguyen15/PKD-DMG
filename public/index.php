@@ -54,6 +54,8 @@ try {
         $path === '/orders' && $method === 'POST' => (new OrderController())->store(),
         preg_match('#^/orders/(\d+)$#', $path, $m) && $method === 'GET' => (new OrderController())->show((int) $m[1]),
         preg_match('#^/orders/(\d+)/status$#', $path, $m) && $method === 'POST' => (new OrderController())->status((int) $m[1]),
+        preg_match('#^/orders/(\d+)/reassign$#', $path, $m) && $method === 'POST' => (new OrderController())->reassign((int) $m[1]),
+        preg_match('#^/orders/(\d+)/delete$#', $path, $m) && $method === 'POST' => (new OrderController())->delete((int) $m[1]),
         preg_match('#^/orders/(\d+)/blacklist$#', $path, $m) && $method === 'POST' => (new OrderController())->blacklistOrder((int) $m[1]),
         preg_match('#^/orders/(\d+)/copy-sent$#', $path, $m) && $method === 'POST' => (new OrderController())->markSentAfterCopy((int) $m[1]),
         $path === '/contacts' && $method === 'GET' => (new ContactController())->index(),
