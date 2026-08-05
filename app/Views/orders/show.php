@@ -1,9 +1,15 @@
 <?php
 $customer = $customerProfile['customer'] ?? null;
-$isBlacklisted = !empty($customer['is_blacklisted']);
+$blacklist = $customerProfile['blacklist'] ?? ['active_count' => 0, 'events' => []];
+$orderBlacklistEntry = $orderBlacklistEntry ?? null;
+$isOrderBlacklisted = !empty($orderBlacklistEntry['active']);
+$blacklistEvents = $blacklist['events'] ?? [];
+$fmtDate = static function (?string $value): string {
+    if (!$value) return '-';
+    $time = strtotime($value);
+    return $time ? date('H:i d/m/Y', $time) : $value;
+};
 ?>
-
-<link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-blacklist.css')) ?>">
 
 <section class="content-grid two">
   <article class="panel">
@@ -58,25 +64,54 @@ $isBlacklisted = !empty($customer['is_blacklisted']);
   </article>
 </section>
 
-<section class="panel customer-flag-panel <?= $isBlacklisted ? 'is-danger' : '' ?>">
+<section class="panel customer-flag-panel <?= ((int) ($blacklist['active_count'] ?? 0) > 0) ? 'is-danger' : '' ?>">
   <div class="section-head">
     <div>
-      <h2><?= $isBlacklisted ? 'Khách đang trong blacklist' : 'Đánh dấu blacklist' ?></h2>
-      <p class="muted small"><?= $isBlacklisted ? e($customer['blacklist_reason'] ?: 'Chưa ghi lý do.') : 'Gắn SĐT này vào danh sách cảnh báo của sale.' ?></p>
+      <h2><?= $isOrderBlacklisted ? 'Đơn này đã nằm trong blacklist' : 'Blacklist theo đơn hàng' ?></h2>
+      <p class="muted small">
+        SĐT này đang có <strong><?= (int) ($blacklist['active_count'] ?? 0) ?></strong> đơn blacklist. Mỗi lần blacklist phải gắn với một đơn cụ thể.
+      </p>
     </div>
-    <a class="btn ghost" href="<?= e(url('/customers/blacklist')) ?>">Xem blacklist</a>
+    <a class="btn ghost" href="<?= e(url('/customers/blacklist?q=' . rawurlencode((string) ($order['phone'] ?? '')))) ?>">Xem hồ sơ</a>
   </div>
+
   <form class="customer-flag-form" method="post" action="<?= e(url('/orders/' . $order['id'] . '/blacklist')) ?>">
     <?= csrf_field() ?>
-    <?php if ($isBlacklisted): ?>
+    <?php if ($isOrderBlacklisted): ?>
       <input type="hidden" name="is_blacklisted" value="0">
-      <button class="btn ghost" type="submit">Gỡ blacklist</button>
+      <div class="blacklist-current-reason">
+        <span>Lý do đơn này</span>
+        <strong><?= e($orderBlacklistEntry['reason'] ?: 'Chưa ghi lý do') ?></strong>
+        <small>Thêm: <?= e($fmtDate($orderBlacklistEntry['added_at'] ?? null)) ?><?= !empty($orderBlacklistEntry['added_by_name']) ? ' · ' . e($orderBlacklistEntry['added_by_name']) : '' ?></small>
+      </div>
+      <button class="btn ghost" type="submit">Gỡ đơn này</button>
     <?php else: ?>
       <input type="hidden" name="is_blacklisted" value="1">
-      <input name="reason" placeholder="Lý do: boom hàng, hủy nhiều lần, không nghe máy" required>
-      <button class="btn danger" type="submit">Thêm blacklist</button>
+      <input name="reason" placeholder="Lý do cho đơn này: boom hàng, hủy sát giờ, không nghe máy" required>
+      <button class="btn danger" type="submit">Thêm đơn này</button>
     <?php endif; ?>
   </form>
+
+  <?php if ($blacklistEvents): ?>
+    <details class="order-blacklist-history" <?= (int) ($blacklist['active_count'] ?? 0) > 0 ? 'open' : '' ?>>
+      <summary>Lịch sử blacklist của SĐT này</summary>
+      <div class="blacklist-event-list compact">
+        <?php foreach ($blacklistEvents as $event): ?>
+          <article class="blacklist-event-card <?= (int) ($event['order_id'] ?? 0) === (int) $order['id'] ? 'is-current' : '' ?>">
+            <div class="blacklist-event-top">
+              <div>
+                <a href="<?= e(url('/orders/' . (int) $event['order_id'])) ?>"><strong><?= e($event['order_code'] ?: ('Đơn #' . (int) $event['order_id'])) ?></strong></a>
+                <small><?= e($event['order_branch_name'] ?: 'Chưa CN') ?> · <?= e($event['order_source_name'] ?: 'Chưa nguồn') ?></small>
+              </div>
+              <b><?= money((int) ($event['order_total'] ?? 0)) ?></b>
+            </div>
+            <div class="blacklist-event-reason"><span>Lý do</span><strong><?= e($event['reason'] ?: 'Chưa ghi lý do') ?></strong></div>
+            <div class="blacklist-event-meta"><span><?= e($fmtDate($event['added_at'] ?? null)) ?></span><span><?= e($event['added_by_name'] ?: 'Không rõ') ?></span></div>
+          </article>
+        <?php endforeach; ?>
+      </div>
+    </details>
+  <?php endif; ?>
 </section>
 
 <section class="panel">
