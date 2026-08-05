@@ -204,6 +204,7 @@
   <script src="<?= e(asset_url('/assets/js/app.js')) ?>"></script>
   <?php if (($title ?? '') === 'Tạo đơn'): ?>
     <script src="<?= e(asset_url('/assets/js/customer-insights.js')) ?>"></script>
+    <script src="<?= e(asset_url('/assets/js/branch-copy-cleanup.js')) ?>"></script>
   <?php endif; ?>
   <?php if (($title ?? '') === 'Cài đặt'): ?>
     <script src="<?= e(asset_url('/assets/js/settings-autosave.js')) ?>"></script>
