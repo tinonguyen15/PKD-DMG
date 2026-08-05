@@ -132,6 +132,7 @@ class OrderController extends Controller
             'copyPreferences' => PreferenceModel::resolved((int) \current_user()['id']),
             'workflowLabels' => OrderModel::WORKFLOW_LABELS,
             'typeLabels' => OrderModel::TYPE_LABELS,
+            'adminUsers' => \is_admin() ? CatalogModel::users(true) : [],
         ]);
     }
 
@@ -141,6 +142,50 @@ class OrderController extends Controller
         OrderModel::updateStatus($id, $status);
         \flash('success', 'Đã cập nhật trạng thái đơn.');
         \redirect((string) ($_SERVER['HTTP_REFERER'] ?? '/orders'));
+    }
+
+    public function reassign(int $id): void
+    {
+        if (!\is_admin()) {
+            http_response_code(403);
+            echo 'Chỉ admin được chuyển người tạo đơn.';
+            return;
+        }
+
+        $newUserId = (int) \input('user_id', 0);
+        try {
+            if (!OrderModel::reassignUser($id, $newUserId)) {
+                \flash('error', 'Không tìm thấy đơn cần chuyển.');
+            } else {
+                \flash('success', 'Đã chuyển người tạo đơn.');
+            }
+        } catch (\Throwable $exception) {
+            \flash('error', $exception->getMessage() ?: 'Không chuyển được người tạo đơn.');
+        }
+
+        \redirect('/orders/' . $id);
+    }
+
+    public function delete(int $id): void
+    {
+        if (!\is_admin()) {
+            http_response_code(403);
+            echo 'Chỉ admin được xóa đơn.';
+            return;
+        }
+
+        try {
+            if (!OrderModel::deleteOrder($id)) {
+                \flash('error', 'Không tìm thấy đơn cần xóa.');
+            } else {
+                \flash('success', 'Đã xóa đơn.');
+            }
+        } catch (\Throwable $exception) {
+            \flash('error', 'Không xóa được đơn. Vui lòng kiểm tra ràng buộc dữ liệu.');
+            \redirect('/orders/' . $id);
+        }
+
+        \redirect('/orders');
     }
 
     public function blacklistOrder(int $id): void
