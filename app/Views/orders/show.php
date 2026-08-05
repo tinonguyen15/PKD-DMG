@@ -54,7 +54,7 @@ $fmtDate = static function (?string $value): string {
         type="button"
         data-copy-target="#branch-copy"
         data-copy-sent-url="<?= e(url('/orders/' . $order['id'] . '/copy-sent')) ?>"
-        data-copy-auto-sent="<?= !empty($copyPreferences['auto_mark_sent_on_branch_copy']) ? '1' : '0' ?>"
+        data-copy-auto-sent="1"
       >Copy gửi CN</button>
     </div>
     <textarea id="branch-copy" class="copy-box" readonly><?= e($branchText) ?></textarea>
