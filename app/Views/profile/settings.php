@@ -19,7 +19,7 @@
     </form>
   <?php endif; ?>
 
-  <form class="stack" method="post" action="<?= e(url('/profile/settings')) ?>">
+  <form class="stack" method="post" action="<?= e(url('/profile/settings')) ?>" data-profile-settings-form>
     <?= csrf_field() ?>
     <?php if (is_admin()): ?>
       <input type="hidden" name="target_user_id" value="<?= (int) $targetUser['id'] ?>">
@@ -32,7 +32,10 @@
     require dirname(__DIR__) . '/partials/preference_fields.php';
     require __DIR__ . '/personal_menu_settings.php';
     ?>
-    <button class="btn primary" type="submit">Lưu cài đặt cá nhân</button>
+    <div class="profile-autosave-footer">
+      <span class="autosave-status" data-profile-autosave-status>Đã sẵn sàng tự lưu</span>
+      <span class="muted small">Sửa xong hệ thống sẽ tự lưu, không cần bấm nút.</span>
+    </div>
   </form>
 </section>
 
