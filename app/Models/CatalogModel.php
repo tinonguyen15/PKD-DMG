@@ -31,13 +31,20 @@ class CatalogModel
     {
         $where = $activeOnly ? 'WHERE mi.active = 1 AND mc.active = 1' : 'WHERE 1 = 1';
 
-        return Database::fetchAll(
+        $items = Database::fetchAll(
             "SELECT mi.*, mc.name AS category_name, mc.slug AS category_slug
              FROM menu_items mi
              JOIN menu_categories mc ON mc.id = mi.category_id
              {$where}
              ORDER BY mc.sort_order, mi.sort_order, mi.name"
         );
+
+        $personalUserId = self::personalMenuUserIdForList();
+        if ($personalUserId > 0) {
+            return PersonalMenuModel::applyToMenuItems($items, $personalUserId);
+        }
+
+        return $items;
     }
 
     public static function menuItem(int|string|null $id = null): ?array
@@ -47,7 +54,7 @@ class CatalogModel
             return null;
         }
 
-        return Database::fetch(
+        $item = Database::fetch(
             "SELECT mi.*, mc.name AS category_name, mc.slug AS category_slug
              FROM menu_items mi
              LEFT JOIN menu_categories mc ON mc.id = mi.category_id
@@ -55,6 +62,17 @@ class CatalogModel
              LIMIT 1",
             [$id]
         ) ?: null;
+
+        if (!$item) {
+            return null;
+        }
+
+        $personalUserId = self::personalMenuUserIdForItem();
+        if ($personalUserId > 0) {
+            return PersonalMenuModel::applyToSingleItem($item, $personalUserId);
+        }
+
+        return $item;
     }
 
     public static function orderSources(bool $activeOnly = true): array
@@ -248,6 +266,29 @@ class CatalogModel
             'INSERT INTO message_templates (category_id, title, content, keywords, is_pinned, active, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
             $params
         );
+    }
+
+    private static function personalMenuUserIdForList(): int
+    {
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '';
+        if ($path !== '/orders/create') {
+            return 0;
+        }
+
+        $user = function_exists('current_user') ? \current_user() : null;
+        return is_array($user) ? (int) ($user['id'] ?? 0) : 0;
+    }
+
+    private static function personalMenuUserIdForItem(): int
+    {
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '';
+        $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if ($path !== '/orders' || $method !== 'POST') {
+            return 0;
+        }
+
+        $user = function_exists('current_user') ? \current_user() : null;
+        return is_array($user) ? (int) ($user['id'] ?? 0) : 0;
     }
 
     private static function slug(string $text): string
