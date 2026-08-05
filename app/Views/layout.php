@@ -202,6 +202,7 @@
   </div>
   <div id="toast-root" class="toast-root"></div>
   <script src="<?= e(asset_url('/assets/js/app.js')) ?>"></script>
+  <script src="<?= e(asset_url('/assets/js/customer-copy-cleanup.js')) ?>"></script>
   <?php if (($title ?? '') === 'Tạo đơn'): ?>
     <script src="<?= e(asset_url('/assets/js/customer-insights.js')) ?>"></script>
     <script src="<?= e(asset_url('/assets/js/branch-copy-cleanup.js')) ?>"></script>
