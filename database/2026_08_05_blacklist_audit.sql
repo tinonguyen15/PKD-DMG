@@ -1,7 +1,25 @@
-ALTER TABLE customers
-  ADD COLUMN blacklisted_by_user_id INT UNSIGNED NULL AFTER blacklist_reason,
-  ADD COLUMN blacklisted_order_id BIGINT UNSIGNED NULL AFTER blacklisted_by_user_id,
-  ADD COLUMN blacklisted_at DATETIME NULL AFTER blacklisted_order_id;
+SET @schema_name = DATABASE();
+
+SET @sql = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @schema_name AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'blacklisted_by_user_id') = 0,
+  'ALTER TABLE customers ADD COLUMN blacklisted_by_user_id INT UNSIGNED NULL AFTER blacklist_reason',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @schema_name AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'blacklisted_order_id') = 0,
+  'ALTER TABLE customers ADD COLUMN blacklisted_order_id BIGINT UNSIGNED NULL AFTER blacklisted_by_user_id',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @schema_name AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'blacklisted_at') = 0,
+  'ALTER TABLE customers ADD COLUMN blacklisted_at DATETIME NULL AFTER blacklisted_order_id',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS customer_blacklist_logs (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
