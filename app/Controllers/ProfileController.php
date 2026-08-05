@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Models\CatalogModel;
 use App\Models\ContactModel;
+use App\Models\InfoPageModel;
 use App\Models\OrderModel;
 use App\Models\PersonalMenuModel;
 use App\Models\PreferenceModel;
@@ -21,6 +22,7 @@ class ProfileController extends Controller
             'users' => \is_admin() ? CatalogModel::users() : [],
             'preferences' => PreferenceModel::userForm((int) $targetUser['id']),
             'personalMenu' => PersonalMenuModel::settings((int) $targetUser['id']),
+            'customInfoTabs' => InfoPageModel::customTabs((int) $targetUser['id']),
             'branches' => CatalogModel::branches(),
             'sources' => CatalogModel::orderSources(),
             'payments' => CatalogModel::paymentMethods(),
@@ -36,6 +38,7 @@ class ProfileController extends Controller
         $targetUser = $this->targetUser((int) \input('target_user_id', 0));
         PreferenceModel::saveUser((int) $targetUser['id'], $_POST);
         PersonalMenuModel::saveUser((int) $targetUser['id'], $_POST);
+        InfoPageModel::saveCustomTabs((int) $targetUser['id'], $_POST);
 
         if ($this->wantsJson()) {
             $this->json([
