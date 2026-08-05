@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
-use App\Models\CustomerModel;
+use App\Models\CustomerBlacklistModel;
 
 class CustomerController extends Controller
 {
@@ -16,8 +16,8 @@ class CustomerController extends Controller
         $this->view('customers/blacklist', [
             'title' => 'Blacklist',
             'filters' => $filters,
-            'rows' => CustomerModel::blacklistRows($filters),
-            'stats' => CustomerModel::blacklistStats(),
+            'rows' => CustomerBlacklistModel::rows($filters),
+            'stats' => CustomerBlacklistModel::stats(),
         ]);
     }
 }
