@@ -69,6 +69,9 @@ class PersonalMenuModel
 
         self::saveSetting($userId, self::KEY_SHOW_FAVORITES, $showFavorites);
         self::saveSetting($userId, self::KEY_ITEMS, $items);
+        if (!$showFavorites) {
+            self::saveSetting($userId, 'favorite_menu_item_ids', []);
+        }
     }
 
     public static function applyToMenuItems(array $items, int $userId): array
