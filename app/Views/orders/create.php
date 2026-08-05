@@ -10,13 +10,6 @@ $drafts = $drafts ?? [];
 $activeOrders = $activeOrders ?? [];
 $workflowLabels = $workflowLabels ?? \App\Models\OrderModel::WORKFLOW_LABELS;
 $typeLabels = $typeLabels ?? \App\Models\OrderModel::TYPE_LABELS;
-$activeOrderGroups = ['processing' => [], 'sent' => []];
-foreach ($activeOrders as $activeOrder) {
-    $status = (string) ($activeOrder['workflow_status'] ?? '');
-    if (array_key_exists($status, $activeOrderGroups)) {
-        $activeOrderGroups[$status][] = $activeOrder;
-    }
-}
 $selectedDraftId = (int) ($old['draft_id'] ?? 0);
 $selectedType = $old['order_type'] ?? ($orderPreferences['default_order_type'] ?? 'delivery');
 if (!array_key_exists($selectedType, ['delivery' => true, 'pickup' => true, 'booking' => true])) {
@@ -76,59 +69,6 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
 <script type="application/json" data-order-preferences><?= json_encode($orderPreferences, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?></script>
 <script type="application/json" data-order-drafts><?= json_encode($drafts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?></script>
 
-<section class="panel active-orders-panel">
-  <div class="section-head">
-    <h2>Đơn đang mở</h2>
-    <a class="btn ghost" href="<?= e(url('/orders')) ?>">Đơn hàng</a>
-  </div>
-  <div class="active-orders-grid">
-    <?php foreach (['processing' => 'Đang xử lý', 'sent' => 'Đã gửi CN'] as $status => $label): ?>
-      <?php $rows = $activeOrderGroups[$status] ?? []; ?>
-      <div class="active-orders-column">
-        <div class="active-orders-column__head">
-          <strong><?= e($label) ?></strong>
-          <span><?= count($rows) ?></span>
-        </div>
-        <div class="active-order-list">
-          <?php foreach ($rows as $row): ?>
-            <?php $copyId = 'active-order-copy-' . (int) $row['id']; ?>
-            <article class="active-order-card <?= $status === 'sent' ? 'is-sent' : '' ?>">
-              <div class="active-order-top">
-                <div>
-                  <a href="<?= e(url('/orders/' . (int) $row['id'])) ?>"><?= e($row['order_code']) ?></a>
-                  <div class="active-order-meta">
-                    <?= e($row['customer_name']) ?> - <?= e($row['phone']) ?><br>
-                    <?= e($row['branch_name'] ?: 'Chưa CN') ?> | <?= e($row['source_name'] ?: 'Chưa nguồn') ?> | <?= e($typeLabels[$row['order_type']] ?? $row['order_type']) ?>
-                  </div>
-                </div>
-                <b><?= money((int) $row['total']) ?></b>
-              </div>
-              <textarea id="<?= e($copyId) ?>" class="active-order-copy" readonly><?= e($row['generated_text'] ?: '') ?></textarea>
-              <div class="active-order-actions">
-                <button
-                  class="btn ghost"
-                  type="button"
-                  data-copy-target="#<?= e($copyId) ?>"
-                  data-copy-sent-url="<?= e(url('/orders/' . (int) $row['id'] . '/copy-sent')) ?>"
-                  data-copy-auto-sent="1"
-                ><?= $status === 'sent' ? 'Copy lại CN' : 'Copy gửi CN' ?></button>
-                <form method="post" action="<?= e(url('/orders/' . (int) $row['id'] . '/status')) ?>">
-                  <?= csrf_field() ?>
-                  <input type="hidden" name="workflow_status" value="completed">
-                  <button class="btn complete" type="submit">Hoàn thành</button>
-                </form>
-              </div>
-            </article>
-          <?php endforeach; ?>
-          <?php if (!$rows): ?>
-            <p class="active-orders-empty">Không có đơn.</p>
-          <?php endif; ?>
-        </div>
-      </div>
-    <?php endforeach; ?>
-  </div>
-</section>
-
 <form
   class="order-layout"
   method="post"
@@ -154,7 +94,53 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
       </div>
       <button class="btn primary" type="button" data-new-draft>Thêm đơn</button>
     </div>
-    <div class="draft-strip" data-draft-list></div>
+
+    <div class="draft-open-strip">
+      <div class="draft-strip" data-draft-list></div>
+
+      <div class="open-order-strip" aria-label="Đơn đang mở">
+        <div class="open-order-label">
+          <strong>Đơn đang mở</strong>
+          <a href="<?= e(url('/orders')) ?>">Đơn hàng</a>
+        </div>
+        <div class="open-order-list">
+          <?php foreach ($activeOrders as $row): ?>
+            <?php
+              $status = (string) ($row['workflow_status'] ?? 'processing');
+              $copyId = 'active-order-copy-' . (int) $row['id'];
+              $completeFormId = 'active-order-complete-' . (int) $row['id'];
+            ?>
+            <article class="open-order-card <?= $status === 'sent' ? 'is-sent' : 'is-processing' ?>">
+              <div class="open-order-main">
+                <a href="<?= e(url('/orders/' . (int) $row['id'])) ?>"><?= e($row['order_code']) ?></a>
+                <span><?= e($workflowLabels[$status] ?? $status) ?></span>
+              </div>
+              <div class="open-order-meta">
+                <?= e($row['customer_name']) ?> - <?= e($row['phone']) ?><br>
+                <?= e($row['branch_name'] ?: 'Chưa CN') ?> | <?= e($row['source_name'] ?: 'Chưa nguồn') ?>
+              </div>
+              <div class="open-order-bottom">
+                <b><?= money((int) $row['total']) ?></b>
+                <div class="open-order-actions">
+                  <button
+                    class="btn ghost"
+                    type="button"
+                    data-copy-target="#<?= e($copyId) ?>"
+                    data-copy-sent-url="<?= e(url('/orders/' . (int) $row['id'] . '/copy-sent')) ?>"
+                    data-copy-auto-sent="1"
+                  ><?= $status === 'sent' ? 'Copy lại CN' : 'Copy gửi CN' ?></button>
+                  <button class="btn complete" type="submit" form="<?= e($completeFormId) ?>">Hoàn thành</button>
+                </div>
+              </div>
+              <textarea id="<?= e($copyId) ?>" class="active-order-copy" readonly><?= e($row['generated_text'] ?: '') ?></textarea>
+            </article>
+          <?php endforeach; ?>
+          <?php if (!$activeOrders): ?>
+            <p class="open-order-empty">Chưa có đơn đang xử lý.</p>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="panel order-form-panel">
@@ -320,6 +306,13 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
     </div>
   </aside>
 </form>
+
+<?php foreach ($activeOrders as $row): ?>
+  <form id="active-order-complete-<?= (int) $row['id'] ?>" class="active-order-complete-form" method="post" action="<?= e(url('/orders/' . (int) $row['id'] . '/status')) ?>">
+    <?= csrf_field() ?>
+    <input type="hidden" name="workflow_status" value="completed">
+  </form>
+<?php endforeach; ?>
 
 <script src="<?= e(asset_url('/assets/js/order-create-flow.js')) ?>"></script>
 <script src="<?= e(asset_url('/assets/js/menu-card-click.js')) ?>"></script>
