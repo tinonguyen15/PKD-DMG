@@ -43,6 +43,9 @@ class CustomerModel
                 'address' => (string) ($summary['last_address'] ?? ''),
                 'is_blacklisted' => 0,
                 'blacklist_reason' => '',
+                'blacklisted_by_user_id' => null,
+                'blacklisted_order_id' => null,
+                'blacklisted_at' => null,
                 'notes' => '',
                 'created_at' => null,
                 'updated_at' => null,
@@ -122,32 +125,138 @@ class CustomerModel
         }
     }
 
-    public static function setBlacklist(string $phone, bool $blacklisted, string $reason = ''): array
+    public static function setBlacklist(string $phone, bool $blacklisted, string $reason = '', int $userId = 0, ?int $orderId = null): array
     {
+        $order = $orderId ? self::orderById($orderId) : null;
+        if ($order && trim((string) ($order['phone'] ?? '')) !== '') {
+            $phone = trim((string) $order['phone']);
+        }
+
         $normalized = self::normalizePhone($phone);
         if ($normalized === '' || strlen($normalized) < 8) {
             throw new \InvalidArgumentException('Số điện thoại không hợp lệ.');
         }
 
         $current = self::lookup($phone);
-        $name = (string) ($current['customer']['name'] ?? $current['summary']['last_customer_name'] ?? '');
-        $address = (string) ($current['customer']['address'] ?? $current['summary']['last_address'] ?? '');
+        $name = trim((string) ($order['customer_name'] ?? '')) ?: (string) ($current['customer']['name'] ?? $current['summary']['last_customer_name'] ?? '');
+        $address = trim((string) ($order['address'] ?? '')) ?: (string) ($current['customer']['address'] ?? $current['summary']['last_address'] ?? '');
         $reason = mb_substr(trim($reason), 0, 255, 'UTF-8');
+        $now = date('Y-m-d H:i:s');
+        $userId = $userId > 0 ? $userId : null;
+        $orderId = $orderId && $orderId > 0 ? $orderId : null;
 
         Database::execute(
-            "INSERT INTO customers (phone_normalized, phone_display, name, address, is_blacklisted, blacklist_reason, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, NOW())
+            "INSERT INTO customers
+             (phone_normalized, phone_display, name, address, last_order_id, is_blacklisted, blacklist_reason,
+              blacklisted_by_user_id, blacklisted_order_id, blacklisted_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 phone_display = VALUES(phone_display),
                 name = CASE WHEN VALUES(name) <> '' THEN VALUES(name) ELSE name END,
                 address = CASE WHEN VALUES(address) <> '' THEN VALUES(address) ELSE address END,
+                last_order_id = COALESCE(VALUES(last_order_id), last_order_id),
                 is_blacklisted = VALUES(is_blacklisted),
                 blacklist_reason = VALUES(blacklist_reason),
-                updated_at = NOW()",
-            [$normalized, $phone, $name, $address, $blacklisted ? 1 : 0, $blacklisted ? $reason : '']
+                blacklisted_by_user_id = CASE WHEN VALUES(is_blacklisted) = 1 THEN VALUES(blacklisted_by_user_id) ELSE blacklisted_by_user_id END,
+                blacklisted_order_id = CASE WHEN VALUES(is_blacklisted) = 1 THEN VALUES(blacklisted_order_id) ELSE blacklisted_order_id END,
+                blacklisted_at = CASE WHEN VALUES(is_blacklisted) = 1 THEN VALUES(blacklisted_at) ELSE blacklisted_at END,
+                updated_at = VALUES(updated_at)",
+            [
+                $normalized,
+                $phone,
+                $name,
+                $address,
+                $orderId,
+                $blacklisted ? 1 : 0,
+                $blacklisted ? $reason : '',
+                $blacklisted ? $userId : null,
+                $blacklisted ? $orderId : null,
+                $blacklisted ? $now : null,
+                $now,
+            ]
         );
 
+        $customer = self::customerByPhone([$normalized]);
+        self::logBlacklistAction($customer, $phone, $normalized, $blacklisted, $reason, $userId, $orderId);
+
         return self::lookup($phone);
+    }
+
+    public static function blacklistRows(array $filters = []): array
+    {
+        $where = ['c.is_blacklisted = 1'];
+        $params = [];
+        $q = trim((string) ($filters['q'] ?? ''));
+        if ($q !== '') {
+            $where[] = '(c.phone_display LIKE ? OR c.phone_normalized LIKE ? OR c.name LIKE ? OR c.blacklist_reason LIKE ? OR o.order_code LIKE ?)';
+            $like = '%' . $q . '%';
+            array_push($params, $like, $like, $like, $like, $like);
+        }
+
+        return Database::fetchAll(
+            "SELECT c.*, u.name AS blacklisted_by_name, u.employee_code AS blacklisted_by_code,
+                    o.order_code, o.customer_name AS order_customer_name, o.workflow_status AS order_status,
+                    o.total AS order_total, o.created_at AS order_created_at,
+                    b.name AS order_branch_name, s.name AS order_source_name
+             FROM customers c
+             LEFT JOIN users u ON u.id = c.blacklisted_by_user_id
+             LEFT JOIN orders o ON o.id = c.blacklisted_order_id
+             LEFT JOIN branches b ON b.id = o.branch_id
+             LEFT JOIN order_sources s ON s.id = o.source_id
+             WHERE " . implode(' AND ', $where) . "
+             ORDER BY COALESCE(c.blacklisted_at, c.updated_at) DESC, c.id DESC",
+            $params
+        );
+    }
+
+    public static function blacklistStats(): array
+    {
+        $row = Database::fetch(
+            "SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(blacklisted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)), 0) AS last_7_days,
+                COALESCE(SUM(blacklisted_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)), 0) AS last_30_days
+             FROM customers
+             WHERE is_blacklisted = 1"
+        );
+
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'last_7_days' => (int) ($row['last_7_days'] ?? 0),
+            'last_30_days' => (int) ($row['last_30_days'] ?? 0),
+        ];
+    }
+
+    private static function logBlacklistAction(?array $customer, string $phone, string $normalized, bool $blacklisted, string $reason, ?int $userId, ?int $orderId): void
+    {
+        try {
+            Database::execute(
+                "INSERT INTO customer_blacklist_logs
+                 (customer_id, phone_normalized, phone_display, order_id, action, reason, user_id, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    $customer ? (int) $customer['id'] : null,
+                    $normalized,
+                    $phone,
+                    $orderId,
+                    $blacklisted ? 'add' : 'remove',
+                    $reason,
+                    $userId,
+                    date('Y-m-d H:i:s'),
+                ]
+            );
+        } catch (\Throwable) {
+            // Nếu bảng log chưa được import thì vẫn cho cập nhật trạng thái blacklist.
+        }
+    }
+
+    private static function orderById(int $orderId): ?array
+    {
+        if ($orderId <= 0) {
+            return null;
+        }
+
+        return Database::fetch('SELECT * FROM orders WHERE id = ? LIMIT 1', [$orderId]) ?: null;
     }
 
     private static function customerByPhone(array $variants): ?array
@@ -293,6 +402,9 @@ class CustomerModel
             'address' => (string) ($customer['address'] ?? ''),
             'is_blacklisted' => (int) ($customer['is_blacklisted'] ?? 0) === 1,
             'blacklist_reason' => (string) ($customer['blacklist_reason'] ?? ''),
+            'blacklisted_by_user_id' => isset($customer['blacklisted_by_user_id']) ? (int) $customer['blacklisted_by_user_id'] : null,
+            'blacklisted_order_id' => isset($customer['blacklisted_order_id']) ? (int) $customer['blacklisted_order_id'] : null,
+            'blacklisted_at' => $customer['blacklisted_at'] ?? null,
             'notes' => (string) ($customer['notes'] ?? ''),
             'updated_at' => $customer['updated_at'] ?? null,
         ];
