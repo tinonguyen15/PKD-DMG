@@ -186,6 +186,83 @@ class OrderModel
         return true;
     }
 
+    public static function reassignUser(int $id, int $newUserId): bool
+    {
+        $order = self::find($id);
+        if (!$order) {
+            return false;
+        }
+
+        $newUser = Database::fetch(
+            'SELECT id, employee_code, name, role, active FROM users WHERE id = ? AND active = 1 LIMIT 1',
+            [$newUserId]
+        );
+        if (!$newUser) {
+            throw new \InvalidArgumentException('Nhân viên nhận đơn không hợp lệ hoặc đang bị khóa.');
+        }
+
+        $oldUserId = (int) $order['user_id'];
+        if ($oldUserId === (int) $newUser['id']) {
+            return true;
+        }
+
+        Database::execute(
+            'UPDATE orders SET user_id = ?, updated_at = ? WHERE id = ?',
+            [(int) $newUser['id'], date('Y-m-d H:i:s'), $id]
+        );
+
+        self::audit('orders.reassign', 'orders', $id, [
+            'from_user_id' => $oldUserId,
+            'from_employee_code' => $order['employee_code'] ?? '',
+            'from_name' => $order['staff_name'] ?? '',
+            'to_user_id' => (int) $newUser['id'],
+            'to_employee_code' => $newUser['employee_code'] ?? '',
+            'to_name' => $newUser['name'] ?? '',
+        ]);
+
+        return true;
+    }
+
+    public static function deleteOrder(int $id): bool
+    {
+        $order = self::find($id);
+        if (!$order) {
+            return false;
+        }
+
+        $pdo = Database::pdo();
+        $pdo->beginTransaction();
+
+        try {
+            Database::execute(
+                'UPDATE customer_blacklist_entries SET active = 0, removed_by_user_id = ?, removed_at = ?, updated_at = ? WHERE order_id = ?',
+                [\current_user()['id'] ?? null, date('Y-m-d H:i:s'), date('Y-m-d H:i:s'), $id]
+            );
+        } catch (\Throwable) {
+            // Bảng blacklist theo đơn là phụ trợ, không chặn xóa đơn nếu production chưa import migration này.
+        }
+
+        try {
+            self::audit('orders.delete', 'orders', $id, [
+                'order_code' => $order['order_code'] ?? '',
+                'customer_name' => $order['customer_name'] ?? '',
+                'phone' => $order['phone'] ?? '',
+                'total' => (int) ($order['total'] ?? 0),
+                'user_id' => (int) ($order['user_id'] ?? 0),
+                'employee_code' => $order['employee_code'] ?? '',
+                'staff_name' => $order['staff_name'] ?? '',
+            ]);
+
+            Database::execute('DELETE FROM orders WHERE id = ?', [$id]);
+            $pdo->commit();
+
+            return true;
+        } catch (\Throwable $exception) {
+            $pdo->rollBack();
+            throw $exception;
+        }
+    }
+
     public static function recentMenuItemIds(int $userId, int $limit = 6): array
     {
         $rows = Database::fetchAll(
@@ -451,7 +528,7 @@ class OrderModel
         }
         if (!empty($filters['source_id'])) {
             $where[] = 'o.source_id = ?';
-            $params[] = (int) $filters['source_id'];
+            $params[] = $filters['source_id'];
         }
         if (!empty($filters['order_type'])) {
             $where[] = 'o.order_type = ?';
