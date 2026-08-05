@@ -11,6 +11,8 @@ $fmtDate = static function (?string $value): string {
 };
 ?>
 
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-blacklist.css')) ?>">
+
 <section class="content-grid two">
   <article class="panel">
     <div class="section-head">
