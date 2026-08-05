@@ -53,35 +53,45 @@
   <button class="btn primary" type="submit">Lọc</button>
 </form>
 
-<section class="kanban">
+<p class="kanban-hint">Có thể <strong>kéo đơn sang cột khác</strong> để đổi trạng thái nhanh. Dropdown trạng thái vẫn dùng bình thường.</p>
+
+<section class="kanban" data-order-kanban>
   <?php foreach ($workflowLabels as $status => $label): ?>
     <?php $rows = array_values(array_filter($orders, fn($order) => $order['workflow_status'] === $status)); ?>
-    <div class="kanban-column">
+    <div class="kanban-column" data-kanban-column data-workflow-status="<?= e($status) ?>">
       <div class="kanban-head">
         <h2><?= e($label) ?></h2>
-        <span><?= count($rows) ?></span>
+        <span data-kanban-count><?= count($rows) ?></span>
       </div>
-      <?php foreach ($rows as $order): ?>
-        <article class="order-card">
-          <strong><a href="<?= e(url('/orders/' . $order['id'])) ?>"><?= e($order['order_code']) ?></a></strong>
-          <p><?= e($order['customer_name']) ?> - <?= e($order['phone']) ?></p>
-          <div class="muted small"><?= e($order['branch_name'] ?: 'Chưa CN') ?> | <?= e($order['source_name'] ?: 'Chưa nguồn') ?> | <?= e($typeLabels[$order['order_type']] ?? $order['order_type']) ?></div>
-          <div class="order-card-bottom">
-            <b><?= money((int) $order['total']) ?></b>
-            <form method="post" action="<?= e(url('/orders/' . $order['id'] . '/status')) ?>">
-              <?= csrf_field() ?>
-              <select name="workflow_status" onchange="this.form.submit()">
-                <?php foreach ($workflowLabels as $key => $statusLabel): ?>
-                  <option value="<?= e($key) ?>" <?= $order['workflow_status'] === $key ? 'selected' : '' ?>><?= e($statusLabel) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </form>
-          </div>
-        </article>
-      <?php endforeach; ?>
-      <?php if (!$rows): ?>
-        <p class="empty">Không có đơn.</p>
-      <?php endif; ?>
+      <div class="kanban-list" data-kanban-list>
+        <?php foreach ($rows as $order): ?>
+          <article
+            class="order-card"
+            draggable="true"
+            data-order-card
+            data-order-id="<?= (int) $order['id'] ?>"
+            data-current-status="<?= e($order['workflow_status']) ?>"
+            data-status-url="<?= e(url('/orders/' . $order['id'] . '/status')) ?>"
+            title="Kéo sang cột khác để đổi trạng thái"
+          >
+            <strong><a href="<?= e(url('/orders/' . $order['id'])) ?>"><?= e($order['order_code']) ?></a></strong>
+            <p><?= e($order['customer_name']) ?> - <?= e($order['phone']) ?></p>
+            <div class="muted small"><?= e($order['branch_name'] ?: 'Chưa CN') ?> | <?= e($order['source_name'] ?: 'Chưa nguồn') ?> | <?= e($typeLabels[$order['order_type']] ?? $order['order_type']) ?></div>
+            <div class="order-card-bottom">
+              <b><?= money((int) $order['total']) ?></b>
+              <form method="post" action="<?= e(url('/orders/' . $order['id'] . '/status')) ?>">
+                <?= csrf_field() ?>
+                <select name="workflow_status" onchange="this.form.submit()">
+                  <?php foreach ($workflowLabels as $key => $statusLabel): ?>
+                    <option value="<?= e($key) ?>" <?= $order['workflow_status'] === $key ? 'selected' : '' ?>><?= e($statusLabel) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </form>
+            </div>
+          </article>
+        <?php endforeach; ?>
+      </div>
+      <p class="empty kanban-empty" data-kanban-empty <?= $rows ? 'hidden' : '' ?>>Không có đơn.</p>
     </div>
   <?php endforeach; ?>
 </section>
