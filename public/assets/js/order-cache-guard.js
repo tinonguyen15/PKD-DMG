@@ -9,6 +9,57 @@
     return Array.from(root.querySelectorAll(selector));
   }
 
+  function injectOpenPanelWidthFix() {
+    if (document.querySelector('[data-open-panel-width-fix]')) return;
+    const style = document.createElement('style');
+    style.dataset.openPanelWidthFix = '1';
+    style.textContent = `
+      @media (min-width: 1181px) {
+        .order-open-panel {
+          width: calc(100% - 430px) !important;
+          max-width: calc(100% - 430px) !important;
+          margin-right: 430px !important;
+          box-sizing: border-box !important;
+          overflow: hidden !important;
+        }
+        .order-open-panel .section-head,
+        .order-open-panel .draft-open-strip,
+        .order-open-panel .open-order-strip,
+        .order-open-panel .open-order-label,
+        .order-open-panel .open-order-list {
+          min-width: 0 !important;
+          max-width: 100% !important;
+        }
+        .order-open-panel .section-head {
+          display: grid !important;
+          grid-template-columns: minmax(0, 1fr) auto !important;
+          align-items: start !important;
+        }
+        .order-open-panel .draft-active-summary {
+          min-width: 0 !important;
+        }
+        .order-open-panel [data-add-processing-order] {
+          position: relative !important;
+          z-index: 2 !important;
+          white-space: nowrap !important;
+        }
+        .order-open-panel .open-order-list {
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          padding-right: 8px !important;
+        }
+      }
+      @media (max-width: 1180px) {
+        .order-open-panel {
+          width: 100% !important;
+          max-width: 100% !important;
+          margin-right: 0 !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function currentOrderId(form) {
     return String(form?.dataset.currentOrderId || form?.querySelector('[data-edit-order-id]')?.value || '');
   }
@@ -219,5 +270,6 @@
     if (id) dirtyOrderIds.delete(id);
     window.requestAnimationFrame(cleanPreviewBox);
   }, true);
+  injectOpenPanelWidthFix();
   window.requestAnimationFrame(cleanPreviewBox);
 })();
