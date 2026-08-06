@@ -5,6 +5,7 @@
   const csrf = () => document.querySelector("input[name='_csrf']")?.value || '';
   const orderCache = new Map();
   const inflight = new Map();
+  let formIndex = null;
 
   function injectSmoothWorkspaceCss() {
     if (document.querySelector('[data-order-workspace-smooth-css]')) return;
@@ -53,6 +54,38 @@
     if (!node) return;
     node.textContent = text;
     node.dataset.autosaveTone = tone || '';
+  }
+
+  function itemIdFromName(name, prefix) {
+    const match = String(name || '').match(new RegExp(`^${prefix}\\[(.+)]$`));
+    return match ? String(match[1]) : '';
+  }
+
+  function indexForm(form) {
+    if (formIndex && formIndex.form === form) return formIndex;
+    const itemInputs = new Map();
+    const noteInputs = new Map();
+    const cards = new Map();
+    const activeItemIds = new Set();
+    const activeNoteIds = new Set();
+
+    $$('[data-menu-card]', form).forEach((card) => {
+      const qty = $('.qty-input', card);
+      const itemId = itemIdFromName(qty?.name, 'items');
+      if (!itemId) return;
+      itemInputs.set(itemId, qty);
+      cards.set(itemId, card);
+      if (Number(qty.value || 0) > 0) activeItemIds.add(itemId);
+
+      const note = $('[data-item-note-row] input', card);
+      if (note) {
+        noteInputs.set(itemId, note);
+        if (String(note.value || '').trim() !== '') activeNoteIds.add(itemId);
+      }
+    });
+
+    formIndex = { form, itemInputs, noteInputs, cards, activeItemIds, activeNoteIds };
+    return formIndex;
   }
 
   function setValueIfChanged(input, value) {
@@ -115,29 +148,135 @@
     });
   }
 
+  function syncTypeFieldsLite(form, type, touchedIds) {
+    const address = $('[data-address-field]', form);
+    const paymentField = $('[data-payment-field]', form);
+    const paymentSelect = $('[name="payment_method_id"]', form);
+    const menuPanel = $('[data-menu-panel]', form);
+    const bookingFields = $$('[data-booking-field], [data-booking-note-field]', form);
+
+    if (address) {
+      address.hidden = type !== 'delivery';
+      $$('input, select, textarea', address).forEach((input) => input.disabled = type !== 'delivery');
+    }
+
+    bookingFields.forEach((field) => {
+      field.hidden = type !== 'booking';
+      $$('input, select, textarea', field).forEach((input) => input.disabled = type !== 'booking');
+    });
+
+    if (paymentField && paymentSelect) {
+      paymentField.hidden = type === 'booking';
+      paymentSelect.disabled = type === 'booking';
+      paymentSelect.required = type !== 'booking';
+      if (type !== 'booking') {
+        Array.from(paymentSelect.options).forEach((option) => {
+          const allowed = (option.dataset.allowedTypes || '').split(/\s+/).filter(Boolean);
+          const visible = allowed.includes(type);
+          option.hidden = !visible;
+          option.disabled = !visible;
+        });
+      }
+    }
+
+    if (menuPanel) menuPanel.hidden = type === 'booking';
+    const index = indexForm(form);
+    const shouldTouchAllMenu = type === 'booking';
+    const ids = shouldTouchAllMenu ? Array.from(index.cards.keys()) : Array.from(touchedIds || []);
+    ids.forEach((id) => {
+      const card = index.cards.get(String(id));
+      if (!card) return;
+      const qty = Math.max(0, parseInt(index.itemInputs.get(String(id))?.value || '0', 10) || 0);
+      const noteRow = $('[data-item-note-row]', card);
+      const noteInput = index.noteInputs.get(String(id));
+      if (noteRow) noteRow.hidden = qty < 1 || type === 'booking';
+      if (noteInput) noteInput.disabled = qty < 1 || type === 'booking';
+      card.classList.toggle('has-note', String(noteInput?.value || '').trim() !== '');
+    });
+  }
+
   function applyItemsDiff(form, payload) {
+    const index = indexForm(form);
     const nextItems = payload.items || {};
     const nextNotes = payload.item_notes || {};
-    const itemIdsToTouch = new Set(Object.keys(nextItems).map(String));
-    const noteIdsToTouch = new Set(Object.keys(nextNotes).map(String));
+    const touchedIds = new Set([
+      ...Array.from(index.activeItemIds),
+      ...Array.from(index.activeNoteIds),
+      ...Object.keys(nextItems).map(String),
+      ...Object.keys(nextNotes).map(String)
+    ]);
+    const nextActiveItemIds = new Set();
+    const nextActiveNoteIds = new Set();
 
-    $$('[name^="items["]', form).forEach((input) => {
-      const match = input.name.match(/^items\[(.+)]$/);
-      const id = match ? String(match[1]) : '';
-      const hasCurrentValue = Number(input.value || 0) !== 0;
-      if (!id || (!hasCurrentValue && !itemIdsToTouch.has(id))) return;
-      setValueIfChanged(input, nextItems[id] || 0);
+    touchedIds.forEach((id) => {
+      const key = String(id);
+      const qtyInput = index.itemInputs.get(key);
+      const noteInput = index.noteInputs.get(key);
+      const nextQty = Number(nextItems[key] || 0);
+      const nextNote = String(nextNotes[key] || '');
+      if (qtyInput) setValueIfChanged(qtyInput, nextQty);
+      if (noteInput) setValueIfChanged(noteInput, nextNote);
+      if (nextQty > 0) nextActiveItemIds.add(key);
+      if (nextNote.trim() !== '') nextActiveNoteIds.add(key);
     });
 
-    $$('[name^="item_notes["]', form).forEach((input) => {
-      const match = input.name.match(/^item_notes\[(.+)]$/);
-      const id = match ? String(match[1]) : '';
-      const hasCurrentNote = String(input.value || '').trim() !== '';
-      if (!id || (!hasCurrentNote && !noteIdsToTouch.has(id))) return;
-      setValueIfChanged(input, nextNotes[id] || '');
-      const card = input.closest('[data-menu-card]');
-      if (card) card.classList.toggle('has-note', String(input.value || '').trim() !== '');
-    });
+    index.activeItemIds = nextActiveItemIds;
+    index.activeNoteIds = nextActiveNoteIds;
+    return touchedIds;
+  }
+
+  function renderCartLines(form, payload, type, total) {
+    const cart = $('[data-cart-lines]', form);
+    if (!cart) return;
+    if (type === 'booking') {
+      const guests = Number(payload.guest_count || 0);
+      cart.innerHTML = `<div class="cart-line"><span>${guests || 0} khách</span><b>Đặt bàn</b></div>`;
+      return;
+    }
+
+    const index = indexForm(form);
+    const html = Object.entries(payload.items || {})
+      .filter(([, qty]) => Number(qty || 0) > 0)
+      .map(([id, qty]) => {
+        const card = index.cards.get(String(id));
+        const quantity = Number(qty || 0);
+        const price = Number(card?.dataset.price || 0);
+        const name = card?.dataset.branchName || card?.dataset.customerName || 'Món';
+        const note = String((payload.item_notes || {})[String(id)] || '').trim();
+        const label = `${quantity} ${name}${note ? ` - ${note}` : ''}`;
+        return `<div class="cart-line"><span>${escapeHtml(label)}</span><b>${money(quantity * price)}</b></div>`;
+      }).join('');
+    cart.innerHTML = html || '<p class="empty small">Chưa chọn món.</p>';
+  }
+
+  function updatePreviewFromPayload(form, data) {
+    const order = data.order || {};
+    const payload = data.payload || {};
+    const type = payload.order_type || 'delivery';
+    const preview = $('[data-order-preview]', form);
+    const total = $('[data-order-total]', form);
+    const timeLabel = $('[data-time-label]', form);
+    const orderTotal = Number(order.total || 0);
+
+    if (preview) setValueIfChanged(preview, order.generated_text || '');
+    if (total) total.textContent = money(orderTotal);
+    if (timeLabel) {
+      const text = type === 'pickup' ? 'Thời gian ghé lấy' : (type === 'booking' ? 'Thời gian' : 'Thời gian nhận');
+      if (timeLabel.childNodes[0]) timeLabel.childNodes[0].nodeValue = `${text} `;
+      const input = $('input', timeLabel);
+      if (input) input.placeholder = type === 'delivery' ? 'Giao ngay' : (type === 'booking' ? 'Ví dụ: 11h hôm nay' : 'Ví dụ: 15p nữa');
+    }
+    renderCartLines(form, payload, type, orderTotal);
+  }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[char]));
   }
 
   function updateOpenOrderCards(order) {
@@ -154,6 +293,7 @@
     if (!form) return;
     const order = data.order || {};
     const payload = data.payload || {};
+    const type = payload.order_type || 'delivery';
 
     form.dataset.workspaceApplying = '1';
     form.dataset.orderEditing = '1';
@@ -168,7 +308,9 @@
     if (title) title.textContent = `Làm tiếp đơn ${order.order_code || '#' + (order.id || '')}`;
 
     applyScalarFields(form, payload);
-    applyItemsDiff(form, payload);
+    const touchedIds = applyItemsDiff(form, payload);
+    syncTypeFieldsLite(form, type, touchedIds);
+    updatePreviewFromPayload(form, data);
 
     $('[data-active-draft-code]') && ($('[data-active-draft-code]').textContent = order.order_code || 'Đang làm');
     $('[data-active-draft-info]') && ($('[data-active-draft-info]').textContent = 'Đơn đang xử lý. Thay đổi sẽ tự lưu.');
@@ -176,7 +318,6 @@
     updateOpenOrderCards(order);
 
     history.replaceState({}, '', `/orders/create?edit_order_id=${order.id || ''}`);
-    form.dispatchEvent(new Event('change', { bubbles: true }));
     window.requestAnimationFrame(() => {
       form.dataset.workspaceApplying = '';
       form.dispatchEvent(new CustomEvent('order-workspace:loaded', { bubbles: true, detail: data }));
