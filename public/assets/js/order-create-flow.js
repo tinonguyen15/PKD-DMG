@@ -46,6 +46,10 @@
       button.disabled = isBusy;
       button.dataset.fastBusy = isBusy ? '1' : '';
     });
+    $$('[data-delete-processing-order]').forEach((button) => {
+      button.disabled = isBusy;
+      button.dataset.fastBusy = isBusy ? '1' : '';
+    });
     const add = $('[data-add-processing-order]');
     if (add) add.disabled = isBusy;
   }
@@ -67,7 +71,7 @@
       .order-copy-feedback.is-success { background: #ecfdf3; border-color: #abefc6; color: #067647; }
       .order-copy-feedback.is-info { background: #eff8ff; border-color: #b2ddff; color: #175cd3; }
       .order-copy-feedback.is-error { background: #fef3f2; border-color: #fecdca; color: #b42318; }
-      [data-order-create] [data-fast-busy="1"] { opacity: .72; pointer-events: none; }
+      [data-order-create] [data-fast-busy="1"], [data-fast-busy="1"] { opacity: .72; pointer-events: none; }
       [data-order-create] .order-inline-error {
         display: block;
         margin-top: 6px;
@@ -89,6 +93,16 @@
         border-color: #f04438 !important;
         box-shadow: 0 0 0 3px rgba(240, 68, 56, .08), 0 12px 26px rgba(15, 23, 42, .05) !important;
       }
+      .open-order-delete-btn {
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 !important;
+        border-radius: 999px !important;
+        font-weight: 900 !important;
+        line-height: 1 !important;
+      }
+      .open-order-card.is-sent .open-order-delete-btn { display: none !important; }
     `;
     document.head.appendChild(style);
   }
@@ -129,18 +143,17 @@
     const data = new FormData();
     data.append('_csrf', csrfToken());
     data.append('workflow_status', status);
+    const payload = await fetchJson(`/orders/${orderId}/status`, { method: 'POST', body: data });
+    if (!payload.updated) throw new Error('Không chuyển được trạng thái đơn.');
+    return payload;
+  }
 
-    const response = await fetch(`/orders/${orderId}/status`, {
-      method: 'POST',
-      body: data,
-      credentials: 'same-origin',
-      redirect: 'manual',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-
-    if (response.type === 'opaqueredirect') return;
-    if (response.status >= 200 && response.status < 400) return;
-    throw new Error('Không chuyển được trạng thái đơn.');
+  async function deleteProcessing(orderId) {
+    const data = new FormData();
+    data.append('_csrf', csrfToken());
+    const payload = await fetchJson(`/orders/${orderId}/delete-processing`, { method: 'POST', body: data });
+    if (!payload.deleted) throw new Error(payload.message || 'Không xóa được đơn đang xử lý.');
+    return payload;
   }
 
   function cleanBranchCopyText(text) {
@@ -304,9 +317,15 @@
     }[char]));
   }
 
-  function itemIdFromName(name, prefix) {
-    const match = String(name || '').match(new RegExp(`^${prefix}\\[(.+)]$`));
-    return match ? String(match[1]) : '';
+  function ensureCardDeleteButton(card) {
+    if (!card || card.querySelector('[data-delete-processing-order]')) return;
+    const actions = $('.open-order-actions', card);
+    if (!actions) return;
+    actions.insertAdjacentHTML('beforeend', '<button class="btn ghost open-order-delete-btn" type="button" title="Xóa đơn đang xử lý" data-delete-processing-order>×</button>');
+  }
+
+  function decorateProcessingCards() {
+    $$('[data-open-order-card].is-processing').forEach(ensureCardDeleteButton);
   }
 
   function renderCard(data) {
@@ -321,7 +340,7 @@
         <article class="open-order-card is-processing" data-open-order-card data-order-id="${order.id}" data-edit-data-url="/orders/${order.id}/edit-data" data-open-order-url="/orders/create?edit_order_id=${order.id}">
           <div class="open-order-main"><a href="/orders/${order.id}">${escapeHtml(order.order_code || ('#' + order.id))}</a><span data-open-order-status>Đang xử lý</span></div>
           <div class="open-order-meta" data-open-order-meta>Chưa nhập tên<br>${escapeHtml(order.branch_name || 'Chưa CN')} | ${escapeHtml(order.source_name || 'Chưa nguồn')}</div>
-          <div class="open-order-bottom"><b data-open-order-total>${money(order.total)}</b><div class="open-order-actions"><button class="btn ghost open-order-edit-btn is-hidden" type="submit" form="${reopenId}" title="Sửa lại đơn đã gửi CN">✎</button><button class="btn complete" type="submit" form="${completeId}">Hoàn thành</button></div></div>
+          <div class="open-order-bottom"><b data-open-order-total>${money(order.total)}</b><div class="open-order-actions"><button class="btn ghost open-order-edit-btn is-hidden" type="submit" form="${reopenId}" title="Sửa lại đơn đã gửi CN">✎</button><button class="btn complete" type="submit" form="${completeId}">Hoàn thành</button><button class="btn ghost open-order-delete-btn" type="button" title="Xóa đơn đang xử lý" data-delete-processing-order>×</button></div></div>
         </article>
       `);
       $('[data-open-order-forms]')?.insertAdjacentHTML('beforeend', `
@@ -339,6 +358,7 @@
       const total = $('[data-open-order-total]', card);
       if (total) total.textContent = money(order.total || 0);
       $('.open-order-edit-btn', card)?.classList.add('is-hidden');
+      ensureCardDeleteButton(card);
     }
   }
 
@@ -458,6 +478,19 @@
     return data;
   }
 
+  function nextProcessingCard(excludeOrderId = 0) {
+    return $$('[data-open-order-card].is-processing')
+      .find((card) => String(card.dataset.orderId || '') !== String(excludeOrderId || '')) || null;
+  }
+
+  async function openNextProcessingOrBlank({ excludeOrderId = 0, focusName = true } = {}) {
+    const card = nextProcessingCard(excludeOrderId);
+    if (card) {
+      return openExistingCard(card, { focusName });
+    }
+    return openBlankOrder({ focusName, message: 'Không còn đơn đang xử lý, đang mở đơn trống mới...' });
+  }
+
   function customerCopyText() {
     const type = selectedValue('order_type') || 'delivery';
     const customerName = form.querySelector('[name="customer_name"]')?.value.trim() || '...';
@@ -543,6 +576,7 @@
     const label = $('[data-open-order-status]', card);
     if (label) label.textContent = 'Đã gửi CN';
     $('.open-order-edit-btn', card)?.classList.remove('is-hidden');
+    $('[data-delete-processing-order]', card)?.remove();
   }
 
   async function finishCurrent(status, { copyBranch = false } = {}) {
@@ -551,7 +585,7 @@
     const orderId = currentOrderId();
     if (!orderId) {
       showFeedback('Đang mở đơn trống, thao tác lại sau 1 giây.', 'info');
-      await openBlankOrder({ focusName: false });
+      await openNextProcessingOrBlank({ focusName: false });
       return;
     }
 
@@ -561,16 +595,16 @@
         const text = cleanBranchCopyText($('[data-order-preview]', form)?.value || '');
         const copied = await copyText(text);
         if (!copied) throw new Error('Không copy được nội dung gửi CN. Hãy copy thủ công.');
-        showFeedback('Đã copy gửi CN. Đang lưu và mở đơn mới...', 'info');
+        showFeedback('Đã copy gửi CN. Đang lưu đơn...', 'info');
       } else {
-        showFeedback('Đang hoàn thành đơn và mở đơn mới...', 'info');
+        showFeedback('Đang hoàn thành đơn...', 'info');
       }
 
       await autosaveCurrent();
       await postStatus(orderId, status);
       markOrderOut(orderId, status);
-      await openBlankOrder({ focusName: true, message: 'Đang mở đơn trống tiếp theo...' });
-      showFeedback(status === 'sent' ? 'Đã gửi CN. Sẵn sàng nhập đơn tiếp theo.' : 'Đã hoàn thành. Sẵn sàng nhập đơn tiếp theo.', 'success');
+      await openNextProcessingOrBlank({ excludeOrderId: orderId, focusName: true });
+      showFeedback(status === 'sent' ? 'Đã gửi CN. Đã mở đơn đang xử lý kế tiếp.' : 'Đã hoàn thành. Đã mở đơn đang xử lý kế tiếp.', 'success');
     } catch (error) {
       showFeedback(error.message || 'Không xử lý được đơn.', 'error');
     } finally {
@@ -588,7 +622,7 @@
       await postStatus(orderId, 'completed');
       markOrderOut(orderId, 'completed');
       if (currentOrderId() === orderId || currentOrderId() <= 0) {
-        await openBlankOrder({ focusName: true, message: 'Đang mở đơn trống tiếp theo...' });
+        await openNextProcessingOrBlank({ excludeOrderId: orderId, focusName: true });
       }
       showFeedback('Đã hoàn thành đơn. Sẵn sàng nhận đơn tiếp theo.', 'success');
     } catch (error) {
@@ -598,16 +632,46 @@
     }
   }
 
+  async function removeProcessingCard(button) {
+    const card = button.closest('[data-open-order-card].is-processing');
+    const orderId = parseInt(card?.dataset.orderId || '0', 10) || 0;
+    if (!card || !orderId || busy) return;
+    if (!window.confirm('Xóa đơn đang xử lý này?')) return;
+
+    setBusy(true);
+    try {
+      await deleteProcessing(orderId);
+      card.remove();
+      if (currentOrderId() === orderId) {
+        form.dataset.currentOrderId = '0';
+        setValue($('[data-edit-order-id]', form), 0);
+        await openNextProcessingOrBlank({ excludeOrderId: orderId, focusName: true });
+      }
+      showFeedback('Đã xóa đơn đang xử lý.', 'success');
+    } catch (error) {
+      showFeedback(error.message || 'Không xóa được đơn đang xử lý.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleClick(event) {
+    const deleteButton = event.target.closest('[data-delete-processing-order]');
     const branchButton = event.target.closest('[data-copy-preview][data-submit-status-after-copy]');
     const customerButton = event.target.closest('[data-copy-customer]');
     const completeButton = event.target.closest('[data-order-create] .primary-actions button[type="submit"]');
-    if (!branchButton && !customerButton && !completeButton) return;
-    if (!event.target.closest('[data-order-create]')) return;
+    if (!deleteButton && !branchButton && !customerButton && !completeButton) return;
 
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
+
+    if (deleteButton) {
+      await removeProcessingCard(deleteButton);
+      return;
+    }
+
+    if (!event.target.closest('[data-order-create]')) return;
 
     if (customerButton) {
       const copied = await copyText(customerCopyText());
@@ -675,14 +739,19 @@
   }
 
   async function ensureWorkingOrder() {
-    if (currentOrderId() > 0) return;
-    const firstProcessing = document.querySelector('[data-open-order-card].is-processing');
+    if (currentOrderId() > 0) {
+      decorateProcessingCards();
+      return;
+    }
+    const firstProcessing = nextProcessingCard();
     try {
       if (firstProcessing) {
         await openExistingCard(firstProcessing, { focusName: true });
+        decorateProcessingCards();
         return;
       }
       await openBlankOrder({ focusName: true, message: 'Đang mở sẵn đơn trống để nhập thông tin...' });
+      decorateProcessingCards();
     } catch (error) {
       showFeedback(error.message || 'Không mở được đơn trống.', 'error');
     }
@@ -694,5 +763,6 @@
   form.addEventListener('change', (event) => clearInlineErrorFromTarget(event.target), true);
 
   injectStyles();
+  decorateProcessingCards();
   window.setTimeout(ensureWorkingOrder, 120);
 })();
