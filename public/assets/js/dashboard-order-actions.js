@@ -1,5 +1,13 @@
 (function () {
   document.addEventListener('submit', (event) => {
+    const reopenForm = event.target.closest('[data-dashboard-reopen-form]');
+    if (reopenForm) {
+      const code = reopenForm.dataset.orderCode || 'đơn này';
+      const ok = window.confirm(`${code} đã gửi CN. Sửa lại sẽ chuyển đơn về Đang xử lý và cần Copy gửi CN lại. Tiếp tục?`);
+      if (!ok) event.preventDefault();
+      return;
+    }
+
     const blacklistForm = event.target.closest('[data-dashboard-blacklist-form]');
     if (blacklistForm) {
       const code = blacklistForm.dataset.orderCode || 'đơn này';
