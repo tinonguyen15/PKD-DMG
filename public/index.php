@@ -8,6 +8,7 @@ use App\Controllers\AuthController;
 use App\Controllers\ContactController;
 use App\Controllers\CustomerController;
 use App\Controllers\DashboardController;
+use App\Controllers\OrderAutosaveController;
 use App\Controllers\OrderController;
 use App\Controllers\ProfileController;
 use App\Controllers\ReportController;
@@ -53,6 +54,7 @@ try {
         $path === '/orders' && $method === 'GET' => (new OrderController())->index(),
         $path === '/orders' && $method === 'POST' => (new OrderController())->store(),
         preg_match('#^/orders/(\d+)$#', $path, $m) && $method === 'GET' => (new OrderController())->show((int) $m[1]),
+        preg_match('#^/orders/(\d+)/autosave$#', $path, $m) && $method === 'POST' => (new OrderAutosaveController())->autosave((int) $m[1]),
         preg_match('#^/orders/(\d+)/status$#', $path, $m) && $method === 'POST' => (new OrderController())->status((int) $m[1]),
         preg_match('#^/orders/(\d+)/reassign$#', $path, $m) && $method === 'POST' => (new OrderController())->reassign((int) $m[1]),
         preg_match('#^/orders/(\d+)/delete$#', $path, $m) && $method === 'POST' => (new OrderController())->delete((int) $m[1]),
