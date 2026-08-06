@@ -8,6 +8,7 @@ use App\Models\ContactModel;
 use App\Models\CustomerBlacklistModel;
 use App\Models\CustomerModel;
 use App\Models\OrderDraftModel;
+use App\Models\OrderEditModel;
 use App\Models\OrderModel;
 use App\Models\PreferenceModel;
 use App\Models\ReportModel;
@@ -19,6 +20,25 @@ class OrderController extends Controller
         $userId = (int) \current_user()['id'];
         $preferences = PreferenceModel::resolved($userId);
         $favoriteItemIds = array_map('intval', (array) ($preferences['favorite_menu_item_ids'] ?? []));
+        $old = \flash('old') ?: [];
+        $editingOrder = null;
+        $editOrderId = (int) ($_GET['edit_order_id'] ?? ($old['edit_order_id'] ?? 0));
+
+        if (!$old && $editOrderId > 0) {
+            $editingOrder = OrderModel::find($editOrderId);
+            if (!$editingOrder) {
+                \flash('error', 'Không tìm thấy đơn cần sửa.');
+                \redirect('/orders/create');
+            }
+            if (($editingOrder['workflow_status'] ?? '') !== 'processing') {
+                \flash('error', 'Đơn đã gửi CN hoặc đã kết thúc. Hãy kéo đơn về Đang xử lý trước khi sửa.');
+                \redirect('/orders/create');
+            }
+            $old = $this->orderToFormOld($editingOrder);
+        } elseif ($editOrderId > 0) {
+            $editingOrder = OrderModel::find($editOrderId);
+        }
+
         $activeOrders = array_values(array_filter(
             OrderModel::all(),
             static fn(array $order): bool => in_array((string) ($order['workflow_status'] ?? ''), ['processing', 'sent'], true)
@@ -36,9 +56,10 @@ class OrderController extends Controller
             'favoriteItemIds' => $favoriteItemIds,
             'drafts' => OrderDraftModel::forUser($userId),
             'activeOrders' => $activeOrders,
+            'editingOrder' => $editingOrder,
             'workflowLabels' => OrderModel::WORKFLOW_LABELS,
             'typeLabels' => OrderModel::TYPE_LABELS,
-            'old' => \flash('old') ?: [],
+            'old' => $old,
             'errors' => \flash('errors') ?: [],
         ]);
     }
@@ -47,6 +68,7 @@ class OrderController extends Controller
     {
         $orderType = $this->orderType((string) \input('order_type', 'delivery'));
         $submitStatus = $this->submitStatus((string) \input('submit_status', 'processing'));
+        $editOrderId = (int) \input('edit_order_id', 0);
         $items = $orderType === 'booking'
             ? []
             : OrderModel::prepareItems($_POST['items'] ?? [], $_POST['item_notes'] ?? []);
@@ -56,10 +78,19 @@ class OrderController extends Controller
         $payment = $this->findById(CatalogModel::paymentMethods(), (int) \input('payment_method_id'));
         $errors = $this->validateOrder($items, $orderType, $payment);
 
+        if ($editOrderId > 0) {
+            $editingOrder = OrderModel::find($editOrderId);
+            if (!$editingOrder) {
+                $errors[] = 'Không tìm thấy đơn cần sửa.';
+            } elseif (($editingOrder['workflow_status'] ?? '') !== 'processing') {
+                $errors[] = 'Chỉ sửa được đơn đang ở trạng thái Đang xử lý. Nếu đã gửi CN, hãy kéo về Đang xử lý trước.';
+            }
+        }
+
         if ($errors) {
             \flash('errors', $errors);
             \flash('old', $_POST);
-            \redirect('/orders/create');
+            \redirect('/orders/create' . ($editOrderId > 0 ? '?edit_order_id=' . $editOrderId : ''));
         }
 
         $data = [
@@ -81,7 +112,13 @@ class OrderController extends Controller
             'quick_notice_keys' => OrderModel::sanitizeQuickNoticeKeys($_POST['quick_notices'] ?? []),
         ];
 
-        $orderId = OrderModel::create($data, $items);
+        if ($editOrderId > 0) {
+            OrderEditModel::updateProcessingOrder($editOrderId, $data, $items);
+            $orderId = $editOrderId;
+        } else {
+            $orderId = OrderModel::create($data, $items);
+        }
+
         if ($submitStatus !== 'processing') {
             OrderModel::updateStatus($orderId, $submitStatus);
         }
@@ -91,17 +128,18 @@ class OrderController extends Controller
         OrderDraftModel::deleteForUser((int) \input('draft_id', 0), (int) \current_user()['id']);
         PreferenceModel::rememberLastOrderChoices((int) \current_user()['id'], $data);
 
+        $prefix = $editOrderId > 0 ? 'Đã cập nhật đơn' : 'Đã lưu đơn';
         if ($submitStatus === 'completed') {
-            \flash('success', 'Đã hoàn thành đơn.');
+            \flash('success', $prefix . ' và chuyển sang hoàn thành.');
             \redirect('/orders?workflow_status=completed');
         }
 
         if ($submitStatus === 'sent') {
-            \flash('success', 'Đã copy gửi CN và chuyển đơn sang Đã gửi CN.');
+            \flash('success', $prefix . ' rồi chuyển sang Đã gửi CN.');
             \redirect('/orders/create');
         }
 
-        \flash('success', 'Đã lưu đơn đang xử lý.');
+        \flash('success', $editOrderId > 0 ? 'Đã lưu chỉnh sửa đơn đang xử lý.' : 'Đã lưu đơn đang xử lý.');
         \redirect('/orders/create');
     }
 
@@ -352,6 +390,47 @@ class OrderController extends Controller
             'pickup' => ['Thanh toán khi ghé lấy', 'Đã thanh toán trước'],
             default => [],
         };
+    }
+
+    private function orderToFormOld(array $order): array
+    {
+        $items = [];
+        $itemNotes = [];
+        foreach ((array) ($order['items'] ?? []) as $item) {
+            $menuItemId = (int) ($item['menu_item_id'] ?? 0);
+            if ($menuItemId <= 0) {
+                continue;
+            }
+            $items[$menuItemId] = (int) ($item['quantity'] ?? 0);
+            $note = trim((string) ($item['item_note'] ?? ''));
+            if ($note !== '') {
+                $itemNotes[$menuItemId] = $note;
+            }
+        }
+
+        $quickNotices = $order['quick_notice_keys'] ?? [];
+        if (is_string($quickNotices)) {
+            $decoded = json_decode($quickNotices, true);
+            $quickNotices = is_array($decoded) ? $decoded : [];
+        }
+
+        return [
+            'edit_order_id' => (int) ($order['id'] ?? 0),
+            'draft_id' => 0,
+            'order_type' => (string) ($order['order_type'] ?? 'delivery'),
+            'source_id' => (int) ($order['source_id'] ?? 0),
+            'customer_name' => (string) ($order['customer_name'] ?? ''),
+            'phone' => (string) ($order['phone'] ?? ''),
+            'branch_id' => (int) ($order['branch_id'] ?? 0),
+            'address' => (string) ($order['address'] ?? ''),
+            'receive_time' => (string) ($order['receive_time'] ?? ''),
+            'payment_method_id' => (int) ($order['payment_method_id'] ?? 0),
+            'guest_count' => (int) ($order['guest_count'] ?? 0),
+            'note' => (string) ($order['note'] ?? ''),
+            'quick_notices' => OrderModel::sanitizeQuickNoticeKeys((array) $quickNotices),
+            'items' => $items,
+            'item_notes' => $itemNotes,
+        ];
     }
 
     private function sortedMenuItems(array $items, array $favoriteItemIds): array
