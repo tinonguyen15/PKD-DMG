@@ -4,7 +4,7 @@
   if (!form || !newOrderForm) return;
 
   const money = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
-  const busyButtons = new Set();
+  let busy = false;
 
   function $(selector, root = document) {
     return root.querySelector(selector);
@@ -14,12 +14,23 @@
     return Array.from(root.querySelectorAll(selector));
   }
 
+  function csrfToken() {
+    return $('[name="_csrf"]', form)?.value || document.querySelector('[name="_csrf"]')?.value || '';
+  }
+
   function currentOrderId() {
     return parseInt(form.dataset.currentOrderId || $('[data-edit-order-id]', form)?.value || '0', 10) || 0;
   }
 
-  function csrfToken() {
-    return $('[name="_csrf"]', form)?.value || document.querySelector('[name="_csrf"]')?.value || '';
+  function setValue(input, value) {
+    if (!input) return;
+    const next = String(value ?? '');
+    if (input.value !== next) input.value = next;
+  }
+
+  function setRadio(name, value) {
+    const target = form.querySelector(`[name="${name}"][value="${CSS.escape(String(value || ''))}"]`);
+    if (target && !target.checked) target.checked = true;
   }
 
   function setStatus(text, tone) {
@@ -29,7 +40,17 @@
     node.dataset.autosaveTone = tone || '';
   }
 
-  function injectFastUiStyles() {
+  function setBusy(isBusy) {
+    busy = isBusy;
+    $$('.cart-panel .primary-actions button', form).forEach((button) => {
+      button.disabled = isBusy;
+      button.dataset.fastBusy = isBusy ? '1' : '';
+    });
+    const add = $('[data-add-processing-order]');
+    if (add) add.disabled = isBusy;
+  }
+
+  function injectStyles() {
     if (document.querySelector('[data-fast-order-style]')) return;
     const style = document.createElement('style');
     style.dataset.fastOrderStyle = '1';
@@ -46,6 +67,7 @@
       .order-copy-feedback.is-success { background: #ecfdf3; border-color: #abefc6; color: #067647; }
       .order-copy-feedback.is-info { background: #eff8ff; border-color: #b2ddff; color: #175cd3; }
       .order-copy-feedback.is-error { background: #fef3f2; border-color: #fecdca; color: #b42318; }
+      [data-order-create] [data-fast-busy="1"] { opacity: .72; pointer-events: none; }
       [data-order-create] .order-inline-error {
         display: block;
         margin-top: 6px;
@@ -67,10 +89,6 @@
         border-color: #f04438 !important;
         box-shadow: 0 0 0 3px rgba(240, 68, 56, .08), 0 12px 26px rgba(15, 23, 42, .05) !important;
       }
-      [data-order-create] [data-fast-busy="1"] {
-        opacity: .72;
-        pointer-events: none;
-      }
     `;
     document.head.appendChild(style);
   }
@@ -89,25 +107,11 @@
   }
 
   function showFeedback(message, tone = 'info') {
-    injectFastUiStyles();
+    injectStyles();
     const node = feedbackNode();
     if (!node) return;
     node.className = `order-copy-feedback is-${tone}`;
     node.textContent = message;
-  }
-
-  function setButtonsBusy(isBusy) {
-    $$('.cart-panel .primary-actions button', form).forEach((button) => {
-      if (isBusy) {
-        busyButtons.add(button);
-        button.dataset.fastBusy = '1';
-        button.disabled = true;
-      } else if (busyButtons.has(button)) {
-        busyButtons.delete(button);
-        button.dataset.fastBusy = '';
-        button.disabled = false;
-      }
-    });
   }
 
   async function fetchJson(url, options = {}) {
@@ -121,22 +125,22 @@
     return payload;
   }
 
-  async function createProcessingPayload() {
-    return fetchJson(newOrderForm.action, {
+  async function postStatus(orderId, status) {
+    const data = new FormData();
+    data.append('_csrf', csrfToken());
+    data.append('workflow_status', status);
+
+    const response = await fetch(`/orders/${orderId}/status`, {
       method: 'POST',
-      body: new FormData(newOrderForm)
+      body: data,
+      credentials: 'same-origin',
+      redirect: 'manual',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
     });
-  }
 
-  function setValue(input, value) {
-    if (!input) return;
-    const next = String(value ?? '');
-    if (input.value !== next) input.value = next;
-  }
-
-  function setRadio(name, value) {
-    const target = form.querySelector(`[name="${name}"][value="${CSS.escape(String(value || ''))}"]`);
-    if (target) target.checked = true;
+    if (response.type === 'opaqueredirect') return;
+    if (response.status >= 200 && response.status < 400) return;
+    throw new Error('Không chuyển được trạng thái đơn.');
   }
 
   function cleanBranchCopyText(text) {
@@ -150,101 +154,51 @@
       .trim();
   }
 
-  function renderCard(data) {
-    const order = data.order || {};
-    if (!order.id) return;
+  function syncTypeFields(type) {
+    const address = $('[data-address-field]', form);
+    const paymentField = $('[data-payment-field]', form);
+    const paymentSelect = $('[name="payment_method_id"]', form);
+    const menuPanel = $('[data-menu-panel]', form);
+    const bookingFields = $$('[data-booking-field], [data-booking-note-field]', form);
 
-    let card = document.querySelector(`[data-open-order-card][data-order-id="${CSS.escape(String(order.id))}"]`);
-    if (!card) {
-      $('[data-open-order-empty]')?.remove();
-      const completeId = `active-order-complete-${order.id}`;
-      const reopenId = `active-order-reopen-${order.id}`;
-      $('[data-open-order-list]')?.insertAdjacentHTML('afterbegin', `
-        <article class="open-order-card is-processing" data-open-order-card data-order-id="${order.id}" data-edit-data-url="/orders/${order.id}/edit-data" data-open-order-url="/orders/create?edit_order_id=${order.id}">
-          <div class="open-order-main"><a href="/orders/${order.id}">${escapeHtml(order.order_code || ('#' + order.id))}</a><span data-open-order-status>Đang xử lý</span></div>
-          <div class="open-order-meta" data-open-order-meta>Chưa nhập tên<br>${escapeHtml(order.branch_name || 'Chưa CN')} | ${escapeHtml(order.source_name || 'Chưa nguồn')}</div>
-          <div class="open-order-bottom"><b data-open-order-total>${money(order.total)}</b><div class="open-order-actions"><button class="btn ghost open-order-edit-btn is-hidden" type="submit" form="${reopenId}" title="Sửa lại đơn đã gửi CN">✎</button><button class="btn complete" type="submit" form="${completeId}">Hoàn thành</button></div></div>
-        </article>
-      `);
-      $('[data-open-order-forms]')?.insertAdjacentHTML('beforeend', `
-        <form id="${completeId}" class="active-order-complete-form" method="post" action="/orders/${order.id}/status"><input type="hidden" name="_csrf" value="${escapeHtml(csrfToken())}"><input type="hidden" name="workflow_status" value="completed"></form>
-        <form id="${reopenId}" class="active-order-reopen-form" method="post" action="/orders/${order.id}/reopen-edit-json"><input type="hidden" name="_csrf" value="${escapeHtml(csrfToken())}"></form>
-      `);
-      card = document.querySelector(`[data-open-order-card][data-order-id="${CSS.escape(String(order.id))}"]`);
+    if (address) {
+      address.hidden = type !== 'delivery';
+      $$('input, select, textarea', address).forEach((input) => input.disabled = type !== 'delivery');
     }
 
-    if (card) {
-      card.classList.remove('is-sent');
-      card.classList.add('is-processing', 'is-editing');
-      $('[data-open-order-status]', card) && ($('[data-open-order-status]', card).textContent = 'Đang làm');
-      $('[data-open-order-total]', card) && ($('[data-open-order-total]', card).textContent = money(order.total));
-      $('.open-order-edit-btn', card)?.classList.add('is-hidden');
+    bookingFields.forEach((field) => {
+      field.hidden = type !== 'booking';
+      $$('input, select, textarea', field).forEach((input) => input.disabled = type !== 'booking');
+    });
+
+    if (paymentField && paymentSelect) {
+      paymentField.hidden = type === 'booking';
+      paymentSelect.disabled = type === 'booking';
+      paymentSelect.required = type !== 'booking';
+      if (type !== 'booking') {
+        let selectedOk = false;
+        Array.from(paymentSelect.options).forEach((option) => {
+          const allowed = (option.dataset.allowedTypes || '').split(/\s+/).filter(Boolean);
+          const visible = allowed.includes(type);
+          option.hidden = !visible;
+          option.disabled = !visible;
+          if (option.selected && visible) selectedOk = true;
+        });
+        if (!selectedOk) {
+          const next = Array.from(paymentSelect.options).find((option) => !option.disabled);
+          if (next) next.selected = true;
+        }
+      }
     }
-  }
 
-  function openPayload(data, { focusName = false } = {}) {
-    const order = data.order || {};
-    const payload = data.payload || {};
-    if (!order.id) return;
-
-    form.dataset.workspaceApplying = '1';
-    form.dataset.orderEditing = '1';
-    form.dataset.currentOrderId = String(order.id);
-    form.dataset.editOrderCode = order.order_code || '';
-    form.classList.remove('is-workspace-hidden', 'is-workspace-loading');
-    $('[data-order-empty-workspace]')?.classList.add('is-hidden');
-
-    setValue($('[data-edit-order-id]', form), order.id);
-    const title = $('[data-workspace-title]', form);
-    if (title) title.textContent = `Làm tiếp đơn ${order.order_code || '#' + order.id}`;
-
-    setRadio('order_type', payload.order_type || 'delivery');
-    setRadio('source_id', payload.source_id || '');
-    ['customer_name', 'phone', 'address', 'receive_time', 'guest_count', 'note'].forEach((name) => {
-      setValue(form.querySelector(`[name="${name}"]`), payload[name] || '');
+    if (menuPanel) menuPanel.hidden = type === 'booking';
+    $$('[data-menu-card]', form).forEach((card) => {
+      const qty = Math.max(0, parseInt($('.qty-input', card)?.value || '0', 10) || 0);
+      const noteRow = $('[data-item-note-row]', card);
+      const noteInput = noteRow ? $('input', noteRow) : null;
+      if (noteRow) noteRow.hidden = qty < 1 || type === 'booking';
+      if (noteInput) noteInput.disabled = qty < 1 || type === 'booking';
     });
-    setValue(form.querySelector('[name="branch_id"]'), payload.branch_id || '');
-    setValue(form.querySelector('[name="payment_method_id"]'), payload.payment_method_id || '');
-    $$('[name="quick_notices[]"]', form).forEach((input) => input.checked = false);
-    $$('[name^="items["]', form).forEach((input) => input.value = '0');
-    $$('[name^="item_notes["]', form).forEach((input) => input.value = '');
-    $$('[data-item-note-row]', form).forEach((row) => row.hidden = true);
-
-    const preview = $('[data-order-preview]', form);
-    if (preview) preview.value = cleanBranchCopyText(order.generated_text || '');
-    $('[data-order-total]', form) && ($('[data-order-total]', form).textContent = money(order.total));
-    $('[data-cart-lines]', form) && ($('[data-cart-lines]', form).innerHTML = '<p class="empty small">Chưa chọn món.</p>');
-    $('[data-active-draft-code]') && ($('[data-active-draft-code]').textContent = order.order_code || 'Đang làm');
-    $('[data-active-draft-info]') && ($('[data-active-draft-info]').textContent = 'Đơn đang xử lý. Thay đổi sẽ tự lưu.');
-
-    $$('.open-order-card').forEach((card) => {
-      const active = String(card.dataset.orderId || '') === String(order.id);
-      card.classList.toggle('is-editing', active);
-      const label = $('[data-open-order-status]', card);
-      if (label) label.textContent = active ? 'Đang làm' : (card.classList.contains('is-sent') ? 'Đã gửi CN' : 'Đang xử lý');
-    });
-
-    setStatus('Đã mở đơn trống. Nhập thông tin là tự lưu.', 'idle');
-    history.replaceState({}, '', `/orders/create?edit_order_id=${order.id}`);
-    window.requestAnimationFrame(() => {
-      form.dataset.workspaceApplying = '';
-      form.dispatchEvent(new CustomEvent('order-workspace:loaded', { bubbles: true, detail: data }));
-      if (focusName) form.querySelector('[name="customer_name"]')?.focus({ preventScroll: true });
-    });
-  }
-
-  async function openBlankOrder({ focusName = false, message = 'Đang tạo đơn trống mới...' } = {}) {
-    if (newOrderForm.dataset.autoCreating === '1') return null;
-    newOrderForm.dataset.autoCreating = '1';
-    setStatus(message, 'saving');
-    try {
-      const data = await createProcessingPayload();
-      renderCard(data);
-      openPayload(data, { focusName });
-      return data;
-    } finally {
-      newOrderForm.dataset.autoCreating = '';
-    }
   }
 
   function selectedValue(name) {
@@ -261,7 +215,7 @@
     return String(value || '').replace(/\D/g, '');
   }
 
-  function selectedItems() {
+  function selectedItemCount() {
     return $$('[name^="items["]', form)
       .map((input) => Math.max(0, parseInt(input.value || '0', 10) || 0))
       .reduce((sum, qty) => sum + qty, 0);
@@ -306,7 +260,7 @@
     return panel;
   }
 
-  function validateForClose() {
+  function validateForBranchOrComplete() {
     clearInlineErrors();
     const type = selectedValue('order_type') || 'delivery';
     const name = form.querySelector('[name="customer_name"]')?.value.trim() || '';
@@ -319,11 +273,11 @@
       if (!name) errors.push(setFieldError('customer_name', 'Nhập tên khách.'));
       if (!/^\d{10}$/.test(phone)) errors.push(setFieldError('phone', 'Nhập SĐT đúng 10 số.'));
       if (!address) errors.push(setFieldError('address', 'Nhập địa chỉ giao hàng.'));
-      if (selectedItems() <= 0) errors.push(setMenuError('Chọn ít nhất 1 món ăn.'));
+      if (selectedItemCount() <= 0) errors.push(setMenuError('Chọn ít nhất 1 món ăn.'));
     } else if (type === 'pickup') {
       if (!name) errors.push(setFieldError('customer_name', 'Nhập tên khách.'));
       if (branchId <= 0) errors.push(setFieldError('branch_id', 'Chọn chi nhánh.'));
-      if (selectedItems() <= 0) errors.push(setMenuError('Chọn ít nhất 1 món ăn.'));
+      if (selectedItemCount() <= 0) errors.push(setMenuError('Chọn ít nhất 1 món ăn.'));
     } else if (type === 'booking') {
       if (!name) errors.push(setFieldError('customer_name', 'Nhập tên khách.'));
       if (branchId <= 0) errors.push(setFieldError('branch_id', 'Chọn chi nhánh.'));
@@ -335,9 +289,173 @@
     const first = errors.find(Boolean);
     if (!first) return true;
     first.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (typeof first.focus === 'function') window.setTimeout(() => first.focus({ preventScroll: true }), 240);
+    if (typeof first.focus === 'function') window.setTimeout(() => first.focus({ preventScroll: true }), 180);
     showFeedback('Còn thiếu thông tin. Kiểm tra các ô đang viền đỏ.', 'error');
     return false;
+  }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[char]));
+  }
+
+  function itemIdFromName(name, prefix) {
+    const match = String(name || '').match(new RegExp(`^${prefix}\\[(.+)]$`));
+    return match ? String(match[1]) : '';
+  }
+
+  function renderCard(data) {
+    const order = data.order || {};
+    if (!order.id) return;
+    let card = document.querySelector(`[data-open-order-card][data-order-id="${CSS.escape(String(order.id))}"]`);
+    if (!card) {
+      $('[data-open-order-empty]')?.remove();
+      const completeId = `active-order-complete-${order.id}`;
+      const reopenId = `active-order-reopen-${order.id}`;
+      $('[data-open-order-list]')?.insertAdjacentHTML('afterbegin', `
+        <article class="open-order-card is-processing" data-open-order-card data-order-id="${order.id}" data-edit-data-url="/orders/${order.id}/edit-data" data-open-order-url="/orders/create?edit_order_id=${order.id}">
+          <div class="open-order-main"><a href="/orders/${order.id}">${escapeHtml(order.order_code || ('#' + order.id))}</a><span data-open-order-status>Đang xử lý</span></div>
+          <div class="open-order-meta" data-open-order-meta>Chưa nhập tên<br>${escapeHtml(order.branch_name || 'Chưa CN')} | ${escapeHtml(order.source_name || 'Chưa nguồn')}</div>
+          <div class="open-order-bottom"><b data-open-order-total>${money(order.total)}</b><div class="open-order-actions"><button class="btn ghost open-order-edit-btn is-hidden" type="submit" form="${reopenId}" title="Sửa lại đơn đã gửi CN">✎</button><button class="btn complete" type="submit" form="${completeId}">Hoàn thành</button></div></div>
+        </article>
+      `);
+      $('[data-open-order-forms]')?.insertAdjacentHTML('beforeend', `
+        <form id="${completeId}" class="active-order-complete-form" method="post" action="/orders/${order.id}/status"><input type="hidden" name="_csrf" value="${escapeHtml(csrfToken())}"><input type="hidden" name="workflow_status" value="completed"></form>
+        <form id="${reopenId}" class="active-order-reopen-form" method="post" action="/orders/${order.id}/reopen-edit-json"><input type="hidden" name="_csrf" value="${escapeHtml(csrfToken())}"></form>
+      `);
+      card = document.querySelector(`[data-open-order-card][data-order-id="${CSS.escape(String(order.id))}"]`);
+    }
+
+    if (card) {
+      card.classList.remove('is-sent');
+      card.classList.add('is-processing', 'is-editing');
+      const status = $('[data-open-order-status]', card);
+      if (status) status.textContent = 'Đang làm';
+      const total = $('[data-open-order-total]', card);
+      if (total) total.textContent = money(order.total || 0);
+      $('.open-order-edit-btn', card)?.classList.add('is-hidden');
+    }
+  }
+
+  function updateCardsForActive(orderId) {
+    $$('[data-open-order-card]').forEach((card) => {
+      const active = String(card.dataset.orderId || '') === String(orderId || '');
+      card.classList.toggle('is-editing', active);
+      const status = $('[data-open-order-status]', card);
+      if (status) status.textContent = active ? 'Đang làm' : (card.classList.contains('is-sent') ? 'Đã gửi CN' : 'Đang xử lý');
+    });
+  }
+
+  function updatePreviewAndCart(data) {
+    const order = data.order || {};
+    const payload = data.payload || {};
+    const type = payload.order_type || 'delivery';
+    const preview = $('[data-order-preview]', form);
+    const totalNode = $('[data-order-total]', form);
+    const cart = $('[data-cart-lines]', form);
+    const total = Number(order.total || 0);
+
+    if (preview) preview.value = cleanBranchCopyText(order.generated_text || '');
+    if (totalNode) totalNode.textContent = money(total);
+
+    if (!cart) return;
+    if (type === 'booking') {
+      cart.innerHTML = `<div class="cart-line"><span>${Number(payload.guest_count || 0)} khách</span><b>Đặt bàn</b></div>`;
+      return;
+    }
+
+    const rows = Object.entries(payload.items || {})
+      .filter(([, qty]) => Number(qty || 0) > 0)
+      .map(([id, qty]) => {
+        const input = form.querySelector(`[name="items[${CSS.escape(String(id))}]"]`);
+        const card = input?.closest('[data-menu-card]');
+        const name = card?.dataset.branchName || card?.dataset.customerName || 'Món';
+        const price = Number(card?.dataset.price || 0);
+        const quantity = Number(qty || 0);
+        const note = String((payload.item_notes || {})[String(id)] || '').trim();
+        return `<div class="cart-line"><span>${quantity} ${escapeHtml(name)}${note ? ` - ${escapeHtml(note)}` : ''}</span><b>${money(quantity * price)}</b></div>`;
+      });
+    cart.innerHTML = rows.length ? rows.join('') : '<p class="empty small">Chưa chọn món.</p>';
+  }
+
+  function openPayload(data, { focusName = false } = {}) {
+    const order = data.order || {};
+    const payload = data.payload || {};
+    if (!order.id) return;
+
+    const type = payload.order_type || 'delivery';
+    form.dataset.workspaceApplying = '1';
+    form.dataset.orderEditing = '1';
+    form.dataset.currentOrderId = String(order.id);
+    form.dataset.editOrderCode = order.order_code || '';
+    form.classList.remove('is-workspace-hidden', 'is-workspace-loading');
+    $('[data-order-empty-workspace]')?.classList.add('is-hidden');
+
+    setValue($('[data-edit-order-id]', form), order.id);
+    const title = $('[data-workspace-title]', form);
+    if (title) title.textContent = `Làm tiếp đơn ${order.order_code || '#' + order.id}`;
+
+    setRadio('order_type', type);
+    setRadio('source_id', payload.source_id || '');
+    ['customer_name', 'phone', 'address', 'receive_time', 'guest_count', 'note'].forEach((name) => setValue(form.querySelector(`[name="${name}"]`), payload[name] || ''));
+    setValue(form.querySelector('[name="branch_id"]'), payload.branch_id || '');
+    setValue(form.querySelector('[name="payment_method_id"]'), payload.payment_method_id || '');
+
+    const notices = new Set((payload.quick_notices || []).map(String));
+    $$('[name="quick_notices[]"]', form).forEach((input) => input.checked = notices.has(input.value));
+
+    $$('[name^="items["]', form).forEach((input) => input.value = '0');
+    Object.entries(payload.items || {}).forEach(([id, qty]) => setValue(form.querySelector(`[name="items[${CSS.escape(String(id))}]"]`), qty || 0));
+    $$('[name^="item_notes["]', form).forEach((input) => input.value = '');
+    Object.entries(payload.item_notes || {}).forEach(([id, note]) => setValue(form.querySelector(`[name="item_notes[${CSS.escape(String(id))}]"]`), note || ''));
+
+    syncTypeFields(type);
+    updatePreviewAndCart(data);
+    const activeCode = $('[data-active-draft-code]');
+    if (activeCode) activeCode.textContent = order.order_code || 'Đang làm';
+    const activeInfo = $('[data-active-draft-info]');
+    if (activeInfo) activeInfo.textContent = 'Đơn đang xử lý. Thay đổi sẽ tự lưu.';
+    updateCardsForActive(order.id);
+    setStatus('Đã mở đơn. Nhập thông tin là tự lưu.', 'idle');
+    history.replaceState({}, '', `/orders/create?edit_order_id=${order.id}`);
+
+    window.requestAnimationFrame(() => {
+      form.dataset.workspaceApplying = '';
+      form.dispatchEvent(new CustomEvent('order-workspace:loaded', { bubbles: true, detail: data }));
+      if (focusName) form.querySelector('[name="customer_name"]')?.focus({ preventScroll: true });
+    });
+  }
+
+  async function createProcessingPayload() {
+    return fetchJson(newOrderForm.action, { method: 'POST', body: new FormData(newOrderForm) });
+  }
+
+  async function openBlankOrder({ focusName = false, message = 'Đang mở đơn trống mới...' } = {}) {
+    if (newOrderForm.dataset.autoCreating === '1') return null;
+    newOrderForm.dataset.autoCreating = '1';
+    setStatus(message, 'saving');
+    try {
+      const data = await createProcessingPayload();
+      renderCard(data);
+      openPayload(data, { focusName });
+      return data;
+    } finally {
+      newOrderForm.dataset.autoCreating = '';
+    }
+  }
+
+  async function openExistingCard(card, { focusName = false } = {}) {
+    if (!card?.dataset.editDataUrl) return null;
+    setStatus('Đang mở đơn đang xử lý...', 'saving');
+    const data = await fetchJson(card.dataset.editDataUrl);
+    renderCard(data);
+    openPayload(data, { focusName });
+    return data;
   }
 
   function customerCopyText() {
@@ -348,8 +466,8 @@
     const address = form.querySelector('[name="address"]')?.value.trim() || '...';
     const receiveTime = form.querySelector('[name="receive_time"]')?.value.trim() || (type === 'delivery' ? 'Giao ngay' : '...');
     const payment = selectedText('payment_method_id') || '...';
+    const items = [];
     let total = 0;
-    const itemLines = [];
 
     $$('[data-menu-card]', form).forEach((card) => {
       const quantity = Math.max(0, parseInt($('.qty-input', card)?.value || '0', 10) || 0);
@@ -358,13 +476,13 @@
       const name = card.dataset.customerName || card.dataset.branchName || 'Món';
       const note = $('[data-item-note-row] input', card)?.value.trim() || '';
       total += quantity * price;
-      itemLines.push(`• ${quantity} ${name}${note ? ` - ${note}` : ''}`);
+      items.push(`• ${quantity} ${name}${note ? ` - ${note}` : ''}`);
     });
 
     const title = type === 'pickup' ? 'ĐƠN GHÉ LẤY' : 'ĐƠN MANG VỀ';
     const lines = [`XÁC NHẬN ${title}`, '', `• Chi nhánh: ${branch}`, `• Tên: ${customerName}`, `• SĐT: ${phone}`];
     if (type === 'delivery') lines.push(`• Địa chỉ: ${address}`);
-    lines.push(...(itemLines.length ? itemLines : ['• Món: ...']));
+    lines.push(...(items.length ? items : ['• Món: ...']));
     lines.push(`=> Tổng: ${money(total)}`);
     lines.push(`• ${type === 'pickup' ? 'Thời gian ghé lấy' : 'Thời gian nhận'}: ${receiveTime}`);
     lines.push(`• Hình thức thanh toán: ${payment}`);
@@ -403,58 +521,41 @@
   async function autosaveCurrent() {
     const id = currentOrderId();
     if (!id) throw new Error('Chưa có đơn đang làm.');
-    const formData = new FormData(form);
-    formData.set('edit_order_id', String(id));
-    formData.set('submit_status', 'processing');
-
-    const payload = await fetchJson(`/orders/${id}/autosave`, {
-      method: 'POST',
-      body: formData
-    });
+    const data = new FormData(form);
+    data.set('edit_order_id', String(id));
+    data.set('submit_status', 'processing');
+    const payload = await fetchJson(`/orders/${id}/autosave`, { method: 'POST', body: data });
     if (!payload.saved) throw new Error(payload.message || 'Không tự lưu được đơn.');
-    if (typeof payload.total !== 'undefined') $('[data-order-total]', form) && ($('[data-order-total]', form).textContent = money(payload.total));
     if (payload.generated_text) $('[data-order-preview]', form).value = cleanBranchCopyText(payload.generated_text);
+    if (typeof payload.total !== 'undefined') $('[data-order-total]', form).textContent = money(payload.total);
     return payload;
   }
 
-  async function postStatus(orderId, status) {
-    const formData = new FormData();
-    formData.append('_csrf', csrfToken());
-    formData.append('workflow_status', status);
-    const response = await fetch(`/orders/${orderId}/status`, {
-      method: 'POST',
-      body: formData,
-      credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    if (!response.ok) throw new Error('Không chuyển được trạng thái đơn.');
-  }
-
-  function markCurrentCardDone(orderId, status) {
+  function markOrderOut(orderId, status) {
     const card = document.querySelector(`[data-open-order-card][data-order-id="${CSS.escape(String(orderId))}"]`);
     if (!card) return;
-
     if (status === 'completed') {
       card.remove();
       return;
     }
-
     card.classList.remove('is-processing', 'is-editing');
     card.classList.add('is-sent');
-    $('[data-open-order-status]', card) && ($('[data-open-order-status]', card).textContent = 'Đã gửi CN');
+    const label = $('[data-open-order-status]', card);
+    if (label) label.textContent = 'Đã gửi CN';
     $('.open-order-edit-btn', card)?.classList.remove('is-hidden');
   }
 
-  async function finishCurrentTo(status, { copyBranch = false } = {}) {
-    if (!validateForClose()) return;
+  async function finishCurrent(status, { copyBranch = false } = {}) {
+    if (busy) return;
+    if (!validateForBranchOrComplete()) return;
     const orderId = currentOrderId();
     if (!orderId) {
-      showFeedback('Đang tạo đơn trống, thao tác lại sau 1 giây.', 'info');
+      showFeedback('Đang mở đơn trống, thao tác lại sau 1 giây.', 'info');
       await openBlankOrder({ focusName: false });
       return;
     }
 
-    setButtonsBusy(true);
+    setBusy(true);
     try {
       if (copyBranch) {
         const text = cleanBranchCopyText($('[data-order-preview]', form)?.value || '');
@@ -462,22 +563,42 @@
         if (!copied) throw new Error('Không copy được nội dung gửi CN. Hãy copy thủ công.');
         showFeedback('Đã copy gửi CN. Đang lưu và mở đơn mới...', 'info');
       } else {
-        showFeedback('Đang lưu và hoàn thành đơn...', 'info');
+        showFeedback('Đang hoàn thành đơn và mở đơn mới...', 'info');
       }
 
       await autosaveCurrent();
       await postStatus(orderId, status);
-      markCurrentCardDone(orderId, status);
-      showFeedback(status === 'sent' ? 'Đã gửi CN. Đã mở sẵn đơn mới.' : 'Đã hoàn thành đơn. Đã mở sẵn đơn mới.', 'success');
+      markOrderOut(orderId, status);
       await openBlankOrder({ focusName: true, message: 'Đang mở đơn trống tiếp theo...' });
+      showFeedback(status === 'sent' ? 'Đã gửi CN. Sẵn sàng nhập đơn tiếp theo.' : 'Đã hoàn thành. Sẵn sàng nhập đơn tiếp theo.', 'success');
     } catch (error) {
       showFeedback(error.message || 'Không xử lý được đơn.', 'error');
     } finally {
-      setButtonsBusy(false);
+      setBusy(false);
     }
   }
 
-  async function handleFastClick(event) {
+  async function completeCard(formNode) {
+    const match = String(formNode.id || '').match(/active-order-complete-(\d+)/);
+    const orderId = match ? parseInt(match[1], 10) : 0;
+    if (!orderId || busy) return;
+
+    setBusy(true);
+    try {
+      await postStatus(orderId, 'completed');
+      markOrderOut(orderId, 'completed');
+      if (currentOrderId() === orderId || currentOrderId() <= 0) {
+        await openBlankOrder({ focusName: true, message: 'Đang mở đơn trống tiếp theo...' });
+      }
+      showFeedback('Đã hoàn thành đơn. Sẵn sàng nhận đơn tiếp theo.', 'success');
+    } catch (error) {
+      showFeedback(error.message || 'Không hoàn thành được đơn.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleClick(event) {
     const branchButton = event.target.closest('[data-copy-preview][data-submit-status-after-copy]');
     const customerButton = event.target.closest('[data-copy-customer]');
     const completeButton = event.target.closest('[data-order-create] .primary-actions button[type="submit"]');
@@ -495,35 +616,48 @@
     }
 
     if (branchButton) {
-      await finishCurrentTo(branchButton.dataset.submitStatusAfterCopy || 'sent', { copyBranch: true });
+      await finishCurrent(branchButton.dataset.submitStatusAfterCopy || 'sent', { copyBranch: true });
       return;
     }
 
-    await finishCurrentTo('completed', { copyBranch: false });
+    await finishCurrent('completed', { copyBranch: false });
   }
 
-  async function handleNewOrderSubmit(event) {
-    if (!event.target.closest('[data-new-processing-form]')) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    setButtonsBusy(true);
-    try {
-      await openBlankOrder({ focusName: true, message: 'Đang tạo đơn mới...' });
-      showFeedback('Đã tạo đơn mới, nhập thông tin là tự lưu.', 'success');
-    } catch (error) {
-      showFeedback(error.message || 'Không tạo được đơn mới.', 'error');
-    } finally {
-      setButtonsBusy(false);
+  async function handleSubmit(event) {
+    const addForm = event.target.closest('[data-new-processing-form]');
+    const completeForm = event.target.closest('.active-order-complete-form');
+    const workspaceSubmit = event.target.closest('[data-order-create]');
+
+    if (addForm) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      if (busy) return;
+      setBusy(true);
+      try {
+        await openBlankOrder({ focusName: true, message: 'Đang tạo đơn mới...' });
+        showFeedback('Đã tạo đơn mới. Nhập thông tin là tự lưu.', 'success');
+      } catch (error) {
+        showFeedback(error.message || 'Không tạo được đơn mới.', 'error');
+      } finally {
+        setBusy(false);
+      }
+      return;
     }
-  }
 
-  function ensureAlwaysHasWorkingOrder() {
-    if (currentOrderId() > 0) return;
-    if (document.querySelector('[data-open-order-card].is-processing')) return;
-    openBlankOrder({ focusName: true, message: 'Đang mở sẵn đơn trống để nhập thông tin...' }).catch((error) => {
-      showFeedback(error.message || 'Không tạo được đơn trống.', 'error');
-    });
+    if (completeForm) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      await completeCard(completeForm);
+      return;
+    }
+
+    if (workspaceSubmit && event.submitter?.closest?.('.primary-actions')) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    }
   }
 
   function clearInlineErrorFromTarget(target) {
@@ -533,36 +667,32 @@
       wrapper.querySelectorAll('.order-inline-error').forEach((node) => node.remove());
       wrapper.querySelectorAll('[aria-invalid="true"]').forEach((node) => node.removeAttribute('aria-invalid'));
     }
-    if (String(target?.name || '').startsWith('items[') && selectedItems() > 0) {
+    if (String(target?.name || '').startsWith('items[') && selectedItemCount() > 0) {
       const panel = $('[data-menu-panel]', form);
       panel?.classList.remove('order-field-invalid');
       panel?.querySelector('.order-inline-error[data-order-error-for="items"]')?.remove();
     }
   }
 
-  function escapeHtml(text) {
-    return String(text).replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    }[char]));
+  async function ensureWorkingOrder() {
+    if (currentOrderId() > 0) return;
+    const firstProcessing = document.querySelector('[data-open-order-card].is-processing');
+    try {
+      if (firstProcessing) {
+        await openExistingCard(firstProcessing, { focusName: true });
+        return;
+      }
+      await openBlankOrder({ focusName: true, message: 'Đang mở sẵn đơn trống để nhập thông tin...' });
+    } catch (error) {
+      showFeedback(error.message || 'Không mở được đơn trống.', 'error');
+    }
   }
 
-  document.addEventListener('click', handleFastClick, true);
-  document.addEventListener('submit', handleNewOrderSubmit, true);
-  form.addEventListener('submit', (event) => {
-    const submitter = event.submitter;
-    if (submitter?.closest?.('.primary-actions')) {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-    }
-  }, true);
+  document.addEventListener('click', handleClick, true);
+  document.addEventListener('submit', handleSubmit, true);
   form.addEventListener('input', (event) => clearInlineErrorFromTarget(event.target), true);
   form.addEventListener('change', (event) => clearInlineErrorFromTarget(event.target), true);
 
-  injectFastUiStyles();
-  window.setTimeout(ensureAlwaysHasWorkingOrder, 180);
+  injectStyles();
+  window.setTimeout(ensureWorkingOrder, 120);
 })();
