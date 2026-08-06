@@ -252,10 +252,43 @@ class OrderController extends Controller
 
     public function status(int $id): void
     {
-        $status = (string) \input('workflow_status', '');
+        $status = $this->submitStatus((string) \input('workflow_status', ''));
         OrderModel::updateStatus($id, $status);
+
+        if ($this->expectsJson()) {
+            $this->json([
+                'updated' => true,
+                'id' => $id,
+                'status' => $status,
+                'label' => OrderModel::workflowLabel($status),
+            ]);
+        }
+
         \flash('success', 'Đã cập nhật trạng thái đơn.');
         \redirect((string) ($_SERVER['HTTP_REFERER'] ?? '/orders'));
+    }
+
+    public function deleteProcessing(int $id): void
+    {
+        $order = OrderModel::find($id);
+        if (!$order) {
+            $this->json(['deleted' => false, 'message' => 'Không tìm thấy đơn cần xóa.'], 404);
+        }
+
+        if ((string) ($order['workflow_status'] ?? '') !== 'processing') {
+            $this->json(['deleted' => false, 'message' => 'Chỉ xóa được đơn đang xử lý.'], 422);
+        }
+
+        if (!\is_admin() && (int) ($order['user_id'] ?? 0) !== (int) (\current_user()['id'] ?? 0)) {
+            $this->json(['deleted' => false, 'message' => 'Bạn không có quyền xóa đơn này.'], 403);
+        }
+
+        try {
+            OrderModel::deleteOrder($id);
+            $this->json(['deleted' => true, 'id' => $id]);
+        } catch (\Throwable $exception) {
+            $this->json(['deleted' => false, 'message' => 'Không xóa được đơn đang xử lý.'], 500);
+        }
     }
 
     public function reassign(int $id): void
@@ -525,5 +558,10 @@ class OrderController extends Controller
         });
 
         return $items;
+    }
+
+    private function expectsJson(): bool
+    {
+        return strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
     }
 }
