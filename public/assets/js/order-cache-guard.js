@@ -122,6 +122,29 @@
       .trim();
   }
 
+  function patchPreviewValueSetter() {
+    if (HTMLTextAreaElement.prototype.__orderPreviewCleanPatched) return;
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+    if (!descriptor?.get || !descriptor?.set) return;
+
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'value', {
+      configurable: true,
+      enumerable: descriptor.enumerable,
+      get: function () {
+        return descriptor.get.call(this);
+      },
+      set: function (value) {
+        const shouldClean = this?.matches?.('[data-order-preview]');
+        descriptor.set.call(this, shouldClean ? cleanBranchCopyText(value) : value);
+      }
+    });
+
+    Object.defineProperty(HTMLTextAreaElement.prototype, '__orderPreviewCleanPatched', {
+      configurable: true,
+      value: true
+    });
+  }
+
   function cleanPreviewBox() {
     const preview = $('[data-order-preview]');
     if (!preview) return;
@@ -270,6 +293,8 @@
     if (id) dirtyOrderIds.delete(id);
     window.requestAnimationFrame(cleanPreviewBox);
   }, true);
+
+  patchPreviewValueSetter();
   injectOpenPanelWidthFix();
   window.requestAnimationFrame(cleanPreviewBox);
 })();
