@@ -336,3 +336,4 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
 
 <script src="<?= e(asset_url('/assets/js/order-create-flow.js')) ?>"></script>
 <script src="<?= e(asset_url('/assets/js/menu-card-click.js')) ?>"></script>
+<script src="<?= e(asset_url('/assets/js/order-edit-mode.js')) ?>"></script>
