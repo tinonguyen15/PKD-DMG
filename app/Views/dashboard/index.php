@@ -15,7 +15,7 @@
   <div class="section-head">
     <div>
       <h2>Đơn mới nhất</h2>
-      <p class="muted small">Sửa đơn và thêm blacklist nhanh ngay tại tổng quan.</p>
+      <p class="muted small">Làm tiếp đơn đang xử lý, sửa lại đơn đã gửi CN và thêm blacklist nhanh.</p>
     </div>
     <a class="btn primary" href="<?= e(url('/orders/create')) ?>">Tạo đơn</a>
   </div>
@@ -35,10 +35,14 @@
       </thead>
       <tbody>
         <?php foreach ($latestOrders as $order): ?>
-          <?php $canEdit = ($order['workflow_status'] ?? '') === 'processing'; ?>
+          <?php
+            $status = (string) ($order['workflow_status'] ?? '');
+            $isProcessing = $status === 'processing';
+            $isSent = $status === 'sent';
+          ?>
           <tr>
             <td><a href="<?= e(url('/orders/' . $order['id'])) ?>"><?= e($order['order_code']) ?></a></td>
-            <td><?= e($order['customer_name']) ?></td>
+            <td><?= e(trim((string) ($order['customer_name'] ?? '')) ?: 'Chưa nhập tên') ?></td>
             <td><?= e($order['branch_name'] ?: 'Chưa CN') ?></td>
             <td><span class="pill <?= e($order['workflow_status']) ?>"><?= e($workflowLabels[$order['workflow_status']] ?? $order['workflow_status']) ?></span></td>
             <td><?= money((int) $order['total']) ?></td>
@@ -46,10 +50,15 @@
             <td><?= money((int) ($order['average_revenue_per_guest'] ?? 0)) ?></td>
             <td>
               <div class="dashboard-order-actions">
-                <?php if ($canEdit): ?>
-                  <a class="dash-action-btn is-edit" href="<?= e(url('/orders/create?edit_order_id=' . (int) $order['id'])) ?>">Sửa</a>
+                <?php if ($isProcessing): ?>
+                  <a class="dash-action-btn is-edit" href="<?= e(url('/orders/create?edit_order_id=' . (int) $order['id'])) ?>">Làm tiếp</a>
+                <?php elseif ($isSent): ?>
+                  <form method="post" action="<?= e(url('/orders/' . (int) $order['id'] . '/reopen-edit')) ?>" data-dashboard-reopen-form data-order-code="<?= e($order['order_code']) ?>">
+                    <?= csrf_field() ?>
+                    <button class="dash-action-btn is-edit" type="submit">✎ Sửa lại</button>
+                  </form>
                 <?php else: ?>
-                  <button class="dash-action-btn is-disabled" type="button" disabled title="Kéo đơn về Đang xử lý trước khi sửa">Sửa</button>
+                  <button class="dash-action-btn is-disabled" type="button" disabled>Không sửa</button>
                 <?php endif; ?>
 
                 <form method="post" action="<?= e(url('/orders/' . (int) $order['id'] . '/blacklist')) ?>" data-dashboard-blacklist-form data-order-code="<?= e($order['order_code']) ?>">
