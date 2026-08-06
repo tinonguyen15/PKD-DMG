@@ -1,48 +1,50 @@
 (function () {
   const form = document.querySelector('[data-order-create]');
-  if (!form) return;
+  const newOrderForm = document.querySelector('[data-new-processing-form]');
+  if (!form || !newOrderForm) return;
 
-  function toast(message) {
-    const root = document.querySelector('#toast-root');
-    if (!root) return;
-    const node = document.createElement('div');
-    node.className = 'toast';
-    node.textContent = message;
-    root.appendChild(node);
-    setTimeout(() => node.remove(), 2400);
+  function currentOrderId() {
+    return parseInt(form.dataset.currentOrderId || form.querySelector('[data-edit-order-id]')?.value || '0', 10) || 0;
   }
 
-  async function copyText(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast('Đã copy');
-      return true;
-    } catch (error) {
-      toast('Không copy được, hãy chọn và copy thủ công');
-      return false;
+  function processingCardCount() {
+    return document.querySelectorAll('[data-open-order-card].is-processing').length;
+  }
+
+  function setStatus(text, tone) {
+    const node = document.querySelector('[data-draft-sync-status]');
+    if (!node) return;
+    node.textContent = text;
+    node.dataset.autosaveTone = tone || '';
+  }
+
+  function dispatchNewOrderSubmit() {
+    const event = typeof SubmitEvent === 'function'
+      ? new SubmitEvent('submit', { bubbles: true, cancelable: true })
+      : new Event('submit', { bubbles: true, cancelable: true });
+    const handled = !newOrderForm.dispatchEvent(event);
+
+    if (!handled) {
+      if (typeof newOrderForm.requestSubmit === 'function') {
+        newOrderForm.requestSubmit();
+      } else {
+        newOrderForm.submit();
+      }
     }
   }
 
-  form.addEventListener('click', async (event) => {
-    const button = event.target.closest('[data-copy-preview][data-submit-status-after-copy]');
-    if (!button) return;
+  function ensureBlankProcessingOrder() {
+    if (currentOrderId() > 0) return;
+    if (processingCardCount() > 0) return;
+    if (newOrderForm.dataset.autoCreating === '1') return;
 
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    newOrderForm.dataset.autoCreating = '1';
+    setStatus('Đang tạo sẵn đơn trống để nhập thông tin...', 'saving');
+    window.setTimeout(dispatchNewOrderSubmit, 80);
+  }
 
-    const preview = form.querySelector('[data-order-preview]');
-    const copied = await copyText(preview ? preview.value : '');
-    if (!copied) return;
-
-    const statusInput = form.querySelector('[data-submit-status]');
-    if (statusInput) {
-      statusInput.value = button.dataset.submitStatusAfterCopy || 'sent';
-    }
-
-    if (typeof form.requestSubmit === 'function') {
-      form.requestSubmit();
-    } else {
-      form.submit();
-    }
-  }, true);
+  window.setTimeout(ensureBlankProcessingOrder, 220);
+  document.addEventListener('order-workspace:loaded', () => {
+    newOrderForm.dataset.autoCreating = '';
+  });
 })();
