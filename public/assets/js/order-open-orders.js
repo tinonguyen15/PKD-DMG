@@ -4,6 +4,14 @@
   const money = (v) => `${Number(v || 0).toLocaleString('vi-VN')}đ`;
   const csrf = () => document.querySelector("input[name='_csrf']")?.value || '';
 
+  function injectSmoothWorkspaceCss() {
+    if (document.querySelector('[data-order-workspace-smooth-css]')) return;
+    const style = document.createElement('style');
+    style.dataset.orderWorkspaceSmoothCss = '1';
+    style.textContent = '.order-workspace-form.is-workspace-loading{opacity:1!important;filter:none!important}.order-workspace-form.is-workspace-loading::after{content:none!important;display:none!important}.order-workspace-form [data-menu-panel],.order-workspace-form .cart-panel{transition:none!important}';
+    document.head.appendChild(style);
+  }
+
   function toast(message) {
     const root = $('#toast-root');
     if (!root) return;
@@ -153,4 +161,6 @@
       toast('Đã chuyển về Đang xử lý để sửa lại');
     } catch (error) { toast(error.message); setStatus('Không sửa lại được đơn.', 'error'); }
   }, true);
+
+  injectSmoothWorkspaceCss();
 })();
