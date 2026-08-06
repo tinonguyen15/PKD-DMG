@@ -1,25 +1,35 @@
 (function () {
-  const form = document.querySelector('[data-order-create][data-order-editing="1"]');
+  const form = document.querySelector('[data-order-create]');
   if (!form) return;
 
   const money = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
   const editInput = form.querySelector('[data-edit-order-id]');
-  const orderId = parseInt(editInput?.value || '0', 10) || 0;
-  const code = form.dataset.editOrderCode || 'Đơn đang xử lý';
-  const autosaveUrl = orderId > 0 ? `/orders/${orderId}/autosave` : '';
-  const statusNode = form.querySelector('[data-draft-sync-status]');
   let autosaveTimer = null;
-  let autosaveStatus = 'Đang sửa đơn cũ. Thay đổi sẽ tự lưu.';
+  let autosaveStatus = 'Chọn đơn để bắt đầu làm.';
   let lastSavedSignature = '';
   let isSaving = false;
   let isSubmitting = false;
   let queuedWhileSaving = false;
 
+  function orderId() {
+    return parseInt(editInput?.value || form.dataset.currentOrderId || '0', 10) || 0;
+  }
+
+  function autosaveUrl() {
+    const id = orderId();
+    return id > 0 ? `/orders/${id}/autosave` : '';
+  }
+
+  function orderCode() {
+    return form.dataset.editOrderCode || 'Đơn đang xử lý';
+  }
+
   function setStatus(text, tone) {
     autosaveStatus = text;
-    if (statusNode) {
-      statusNode.textContent = text;
-      statusNode.dataset.autosaveTone = tone || '';
+    const syncStatus = document.querySelector('[data-draft-sync-status]');
+    if (syncStatus) {
+      syncStatus.textContent = text;
+      syncStatus.dataset.autosaveTone = tone || '';
     }
     refreshHeader();
   }
@@ -37,31 +47,20 @@
   }
 
   function refreshHeader() {
-    const activeCode = form.querySelector('[data-active-draft-code]');
-    const activeInfo = form.querySelector('[data-active-draft-info]');
-    const syncStatus = form.querySelector('[data-draft-sync-status]');
+    const activeCode = document.querySelector('[data-active-draft-code]');
+    const activeInfo = document.querySelector('[data-active-draft-info]');
+    const syncStatus = document.querySelector('[data-draft-sync-status]');
     const name = form.querySelector('[name="customer_name"]')?.value.trim() || 'Chưa nhập tên';
     const summary = totalFromForm();
 
-    if (activeCode) activeCode.textContent = code;
-    if (activeInfo) activeInfo.textContent = `${name} | ${summary.count} món | ${money(summary.total)}`;
+    if (activeCode) activeCode.textContent = orderId() > 0 ? orderCode() : 'Chọn đơn hoặc thêm đơn mới';
+    if (activeInfo) activeInfo.textContent = orderId() > 0 ? `${name} | ${summary.count} món | ${money(summary.total)}` : 'Click vào đơn Đang xử lý để làm tiếp.';
     if (syncStatus) syncStatus.textContent = autosaveStatus;
-  }
-
-  function removeManualSaveButton() {
-    const actions = form.querySelector('.primary-actions');
-    if (!actions) return;
-    Array.from(actions.querySelectorAll('button')).forEach((button) => {
-      if ((button.textContent || '').trim().toLowerCase() === 'lưu sửa') {
-        button.remove();
-      }
-    });
   }
 
   function formSignature() {
     const data = new FormData(form);
     data.delete('submit_status');
-    data.delete('draft_id');
     const entries = [];
     data.forEach((value, key) => entries.push([key, String(value)]));
     entries.sort((a, b) => a[0] === b[0] ? a[1].localeCompare(b[1]) : a[0].localeCompare(b[0]));
@@ -69,7 +68,8 @@
   }
 
   async function autosaveNow({ quiet = false } = {}) {
-    if (!autosaveUrl || isSubmitting) return false;
+    const url = autosaveUrl();
+    if (!url || isSubmitting || form.dataset.workspaceLoading === '1') return false;
 
     const signature = formSignature();
     if (signature === lastSavedSignature && !quiet) return true;
@@ -83,11 +83,11 @@
     if (!quiet) setStatus('Đang tự lưu...', 'saving');
 
     const formData = new FormData(form);
-    formData.set('edit_order_id', String(orderId));
+    formData.set('edit_order_id', String(orderId()));
     formData.set('submit_status', 'processing');
 
     try {
-      const response = await fetch(autosaveUrl, {
+      const response = await fetch(url, {
         method: 'POST',
         body: formData,
         credentials: 'same-origin',
@@ -119,7 +119,7 @@
   }
 
   function queueAutosave() {
-    if (!autosaveUrl || isSubmitting) return;
+    if (!autosaveUrl() || isSubmitting || form.dataset.workspaceLoading === '1') return;
     refreshHeader();
     if (autosaveTimer) clearTimeout(autosaveTimer);
     setStatus('Đang chờ tự lưu...', 'pending');
@@ -134,9 +134,10 @@
 
   async function saveBeforeNavigation(event) {
     const link = event.target.closest('a[href]');
-    if (!link || !form.contains(document.activeElement) && !form.contains(link) && !link.closest('.open-order-list')) return;
+    if (!link || link.closest('[data-open-order-card]')) return;
     const href = link.getAttribute('href') || '';
     if (!href || href.startsWith('#') || link.target === '_blank' || link.dataset.noEditAutosave === '1') return;
+    if (!autosaveUrl()) return;
 
     if (autosaveTimer) clearTimeout(autosaveTimer);
     event.preventDefault();
@@ -145,15 +146,14 @@
   }
 
   function sendBeaconAutosave() {
-    if (!autosaveUrl || isSubmitting) return;
+    const url = autosaveUrl();
+    if (!url || isSubmitting) return;
     try {
       const data = new FormData(form);
-      data.set('edit_order_id', String(orderId));
+      data.set('edit_order_id', String(orderId()));
       data.set('submit_status', 'processing');
-      navigator.sendBeacon?.(autosaveUrl, data);
-    } catch (error) {
-      // Best-effort only. Normal autosave already handles most changes.
-    }
+      navigator.sendBeacon?.(url, data);
+    } catch (error) {}
   }
 
   form.addEventListener('input', (event) => {
@@ -166,9 +166,7 @@
 
   form.addEventListener('click', (event) => {
     window.requestAnimationFrame(refreshHeader);
-    if (shouldAutosaveEventTarget(event.target)) {
-      window.setTimeout(queueAutosave, 80);
-    }
+    if (shouldAutosaveEventTarget(event.target)) window.setTimeout(queueAutosave, 80);
   }, true);
 
   form.addEventListener('submit', () => {
@@ -176,13 +174,18 @@
     if (autosaveTimer) clearTimeout(autosaveTimer);
   });
 
+  form.addEventListener('order-workspace:loaded', () => {
+    isSubmitting = false;
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    lastSavedSignature = formSignature();
+    setStatus('Đã mở đơn. Sửa gì hệ thống sẽ tự lưu.', 'idle');
+    refreshHeader();
+  });
+
   document.addEventListener('click', saveBeforeNavigation, true);
   window.addEventListener('beforeunload', sendBeaconAutosave);
 
-  removeManualSaveButton();
   lastSavedSignature = formSignature();
   refreshHeader();
-  setStatus('Đang sửa đơn cũ. Thay đổi sẽ tự lưu.', 'idle');
-  window.setTimeout(refreshHeader, 0);
-  window.setTimeout(refreshHeader, 80);
+  if (orderId() > 0) setStatus('Đã mở đơn. Sửa gì hệ thống sẽ tự lưu.', 'idle');
 })();
