@@ -4,13 +4,11 @@ $blacklist = $customerProfile['blacklist'] ?? ['active_count' => 0, 'events' => 
 $orderBlacklistEntry = $orderBlacklistEntry ?? null;
 $isOrderBlacklisted = !empty($orderBlacklistEntry['active']);
 $blacklistEvents = $blacklist['events'] ?? [];
-$adminUsers = $adminUsers ?? [];
 $workflowKeys = array_keys($workflowLabels);
 $currentWorkflow = (string) ($order['workflow_status'] ?? 'processing');
 $currentWorkflowIndex = array_search($currentWorkflow, $workflowKeys, true);
 $currentWorkflowIndex = $currentWorkflowIndex === false ? 0 : (int) $currentWorkflowIndex;
 $statusProgress = count($workflowKeys) > 1 ? round(($currentWorkflowIndex / (count($workflowKeys) - 1)) * 100, 2) : 0;
-$canEditOrder = $currentWorkflow === 'processing';
 $fmtDate = static function (?string $value): string {
     if (!$value) return '-';
     $time = strtotime($value);
@@ -87,81 +85,6 @@ $fmtDate = static function (?string $value): string {
           <?php endforeach; ?>
         </div>
       </form>
-    </div>
-
-    <div class="order-quick-panel">
-      <div class="order-quick-head">
-        <div>
-          <h3>Thao tác nhanh</h3>
-          <p>Sửa đơn, chuyển người tạo, blacklist hoặc xóa đơn tại đây.</p>
-        </div>
-        <a class="btn ghost" href="<?= e(url('/orders')) ?>">Danh sách đơn</a>
-      </div>
-
-      <div class="order-quick-grid">
-        <article class="order-quick-card">
-          <div>
-            <strong>Sửa đơn</strong>
-            <small><?= $canEditOrder ? 'Mở lại form tạo đơn để chỉnh nội dung.' : 'Đơn phải ở trạng thái Đang xử lý mới sửa được.' ?></small>
-          </div>
-          <?php if ($canEditOrder): ?>
-            <a class="btn primary" href="<?= e(url('/orders/create?edit_order_id=' . (int) $order['id'])) ?>">Sửa</a>
-          <?php else: ?>
-            <button class="btn ghost" type="button" disabled>Kéo về Đang xử lý</button>
-          <?php endif; ?>
-        </article>
-
-        <?php if (is_admin()): ?>
-          <form class="order-quick-card order-quick-form" method="post" action="<?= e(url('/orders/' . $order['id'] . '/reassign')) ?>">
-            <?= csrf_field() ?>
-            <div>
-              <strong>Chuyển người tạo</strong>
-              <small>Chỉ admin thao tác. Có ghi audit log.</small>
-            </div>
-            <div class="quick-form-row">
-              <select name="user_id" required>
-                <?php foreach ($adminUsers as $user): ?>
-                  <option value="<?= (int) $user['id'] ?>" <?= (int) $order['user_id'] === (int) $user['id'] ? 'selected' : '' ?>>
-                    <?= e($user['employee_code'] . ' - ' . $user['name']) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-              <button class="btn primary" type="submit">Chuyển</button>
-            </div>
-          </form>
-
-          <form class="order-quick-card order-quick-form order-quick-danger" method="post" action="<?= e(url('/orders/' . $order['id'] . '/delete')) ?>" onsubmit="return confirm('Xóa đơn <?= e($order['order_code']) ?>? Thao tác này không hoàn tác được.');">
-            <?= csrf_field() ?>
-            <div>
-              <strong>Xóa đơn</strong>
-              <small>Dùng cho đơn test/sai. Sau khi xóa sẽ quay về danh sách đơn.</small>
-            </div>
-            <button class="btn danger" type="submit">Xóa</button>
-          </form>
-        <?php endif; ?>
-
-        <form class="order-quick-card order-quick-form <?= $isOrderBlacklisted ? 'order-quick-warning' : '' ?>" method="post" action="<?= e(url('/orders/' . $order['id'] . '/blacklist')) ?>">
-          <?= csrf_field() ?>
-          <div>
-            <strong><?= $isOrderBlacklisted ? 'Đơn đã blacklist' : 'Thêm vào blacklist' ?></strong>
-            <small>SĐT này đang có <?= (int) ($blacklist['active_count'] ?? 0) ?> đơn blacklist.</small>
-          </div>
-          <?php if ($isOrderBlacklisted): ?>
-            <input type="hidden" name="is_blacklisted" value="0">
-            <p class="quick-current-reason"><?= e($orderBlacklistEntry['reason'] ?: 'Chưa ghi lý do') ?></p>
-            <div class="quick-form-row">
-              <a class="btn ghost" href="<?= e(url('/customers/blacklist?q=' . rawurlencode((string) ($order['phone'] ?? '')))) ?>">Xem hồ sơ</a>
-              <button class="btn ghost" type="submit">Gỡ blacklist</button>
-            </div>
-          <?php else: ?>
-            <input type="hidden" name="is_blacklisted" value="1">
-            <div class="quick-form-row is-wide">
-              <input name="reason" placeholder="Lý do: boom hàng, hủy sát giờ, không nghe máy" required>
-              <button class="btn danger" type="submit">Thêm blacklist</button>
-            </div>
-          <?php endif; ?>
-        </form>
-      </div>
     </div>
   </article>
 
