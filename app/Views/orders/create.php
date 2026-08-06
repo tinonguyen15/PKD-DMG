@@ -7,6 +7,9 @@ $selectedQuickNotices = \App\Models\OrderModel::sanitizeQuickNoticeKeys($old['qu
 $favoriteItemIds = array_map('intval', $favoriteItemIds ?? []);
 $drafts = $drafts ?? [];
 $activeOrders = $activeOrders ?? [];
+$editingOrder = $editingOrder ?? null;
+$editingOrderId = (int) ($old['edit_order_id'] ?? ($editingOrder['id'] ?? 0));
+$editingOrderCode = is_array($editingOrder) ? (string) ($editingOrder['order_code'] ?? '') : '';
 $workflowLabels = $workflowLabels ?? \App\Models\OrderModel::WORKFLOW_LABELS;
 $typeLabels = $typeLabels ?? \App\Models\OrderModel::TYPE_LABELS;
 $selectedDraftId = (int) ($old['draft_id'] ?? 0);
@@ -65,33 +68,46 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
   </div>
 <?php endif; ?>
 
+<?php if ($editingOrderId > 0): ?>
+  <div class="alert success order-editing-banner">
+    Đang sửa đơn <?= e($editingOrderCode ?: ('#' . $editingOrderId)) ?>. Chỉ sửa được khi đơn ở trạng thái Đang xử lý.
+  </div>
+<?php endif; ?>
+
 <script type="application/json" data-order-preferences><?= json_encode($orderPreferences, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?></script>
-<script type="application/json" data-order-drafts><?= json_encode($drafts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?></script>
+<script type="application/json" data-order-drafts><?= json_encode($editingOrderId > 0 ? [] : $drafts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?></script>
 
 <form
   class="order-layout"
   method="post"
   action="<?= e(url('/orders')) ?>"
   data-order-create
-  data-draft-save-url="<?= e(url('/orders/drafts')) ?>"
-  data-drafts-url="<?= e(url('/orders/drafts')) ?>"
+  data-order-editing="<?= $editingOrderId > 0 ? '1' : '0' ?>"
+  data-edit-order-code="<?= e($editingOrderCode ?: ($editingOrderId > 0 ? '#' . $editingOrderId : '')) ?>"
+  data-draft-save-url="<?= $editingOrderId > 0 ? '' : e(url('/orders/drafts')) ?>"
+  data-drafts-url="<?= $editingOrderId > 0 ? '' : e(url('/orders/drafts')) ?>"
   data-customer-lookup-url="<?= e(url('/orders/customer-lookup')) ?>"
   data-customer-blacklist-url="<?= e(url('/orders/customer-blacklist')) ?>"
-  data-draft-storage-key="pkd_order_drafts_<?= (int) current_user()['id'] ?>"
+  data-draft-storage-key="<?= $editingOrderId > 0 ? '' : 'pkd_order_drafts_' . (int) current_user()['id'] ?>"
 >
   <?= csrf_field() ?>
   <input type="hidden" name="draft_id" value="<?= $selectedDraftId ?>" data-draft-id>
+  <input type="hidden" name="edit_order_id" value="<?= $editingOrderId ?>" data-edit-order-id>
   <input type="hidden" name="submit_status" value="processing" data-submit-status>
 
   <section class="panel draft-panel" data-draft-panel>
     <div class="section-head">
       <div class="draft-active-summary">
-        <span>Đang nhập</span>
-        <strong data-active-draft-code>Nháp mới</strong>
-        <p data-active-draft-info>Chưa có nội dung.</p>
-        <small data-draft-sync-status>Đã sẵn sàng.</small>
+        <span><?= $editingOrderId > 0 ? 'Đang sửa' : 'Đang nhập' ?></span>
+        <strong data-active-draft-code><?= $editingOrderId > 0 ? e($editingOrderCode ?: ('#' . $editingOrderId)) : 'Nháp mới' ?></strong>
+        <p data-active-draft-info><?= $editingOrderId > 0 ? 'Sửa xong bấm Lưu sửa, Copy gửi CN hoặc Hoàn thành.' : 'Chưa có nội dung.' ?></p>
+        <small data-draft-sync-status><?= $editingOrderId > 0 ? 'Đơn cũ sẽ được cập nhật, không tạo mã đơn mới.' : 'Đã sẵn sàng.' ?></small>
       </div>
-      <button class="btn primary" type="button" data-new-draft>Thêm đơn</button>
+      <?php if ($editingOrderId > 0): ?>
+        <a class="btn primary" href="<?= e(url('/orders/create')) ?>">Tạo đơn mới</a>
+      <?php else: ?>
+        <button class="btn primary" type="button" data-new-draft>Thêm đơn</button>
+      <?php endif; ?>
     </div>
 
     <div class="draft-open-strip">
@@ -108,11 +124,12 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
               $status = (string) ($row['workflow_status'] ?? 'processing');
               $copyId = 'active-order-copy-' . (int) $row['id'];
               $completeFormId = 'active-order-complete-' . (int) $row['id'];
+              $isCurrentEdit = $editingOrderId === (int) $row['id'];
             ?>
-            <article class="open-order-card <?= $status === 'sent' ? 'is-sent' : 'is-processing' ?>">
+            <article class="open-order-card <?= $status === 'sent' ? 'is-sent' : 'is-processing' ?> <?= $isCurrentEdit ? 'is-editing' : '' ?>">
               <div class="open-order-main">
                 <a href="<?= e(url('/orders/' . (int) $row['id'])) ?>"><?= e($row['order_code']) ?></a>
-                <span><?= e($workflowLabels[$status] ?? $status) ?></span>
+                <span><?= $isCurrentEdit ? 'Đang sửa' : e($workflowLabels[$status] ?? $status) ?></span>
               </div>
               <div class="open-order-meta">
                 <?= e($row['customer_name']) ?> - <?= e($row['phone']) ?><br>
@@ -121,6 +138,9 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
               <div class="open-order-bottom">
                 <b><?= money((int) $row['total']) ?></b>
                 <div class="open-order-actions">
+                  <?php if ($status === 'processing'): ?>
+                    <a class="btn ghost" href="<?= e(url('/orders/create?edit_order_id=' . (int) $row['id'])) ?>">Sửa</a>
+                  <?php endif; ?>
                   <button
                     class="btn ghost"
                     type="button"
@@ -144,7 +164,7 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
 
   <section class="panel order-form-panel">
     <div class="section-head">
-      <h2>Tạo đơn</h2>
+      <h2><?= $editingOrderId > 0 ? 'Sửa đơn' : 'Tạo đơn' ?></h2>
       <a class="btn ghost" href="<?= e(url('/orders')) ?>">Đơn hàng</a>
     </div>
 
@@ -297,6 +317,9 @@ $selectedPayment = $allowedPaymentId($selectedPaymentCandidate, $selectedType) ?
     <textarea class="copy-box" readonly data-order-preview></textarea>
     <div class="cart-lines" data-cart-lines></div>
     <div class="primary-actions">
+      <?php if ($editingOrderId > 0): ?>
+        <button class="btn ghost" type="submit" onclick="this.form.querySelector('[data-submit-status]').value='processing'">Lưu sửa</button>
+      <?php endif; ?>
       <button class="btn ghost" type="button" data-copy-preview data-submit-status-after-copy="sent">Copy gửi CN</button>
       <button class="btn ghost" type="button" data-copy-customer>Copy gửi KH</button>
       <button class="btn primary" type="submit" onclick="this.form.querySelector('[data-submit-status]').value='completed'">Hoàn thành</button>
