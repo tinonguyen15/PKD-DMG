@@ -4,7 +4,11 @@ $blacklist = $customerProfile['blacklist'] ?? ['active_count' => 0, 'events' => 
 $orderBlacklistEntry = $orderBlacklistEntry ?? null;
 $isOrderBlacklisted = !empty($orderBlacklistEntry['active']);
 $blacklistEvents = $blacklist['events'] ?? [];
-$adminUsers = $adminUsers ?? [];
+$workflowKeys = array_keys($workflowLabels);
+$currentWorkflow = (string) ($order['workflow_status'] ?? 'processing');
+$currentWorkflowIndex = array_search($currentWorkflow, $workflowKeys, true);
+$currentWorkflowIndex = $currentWorkflowIndex === false ? 0 : (int) $currentWorkflowIndex;
+$statusProgress = count($workflowKeys) > 1 ? round(($currentWorkflowIndex / (count($workflowKeys) - 1)) * 100, 2) : 0;
 $fmtDate = static function (?string $value): string {
     if (!$value) return '-';
     $time = strtotime($value);
@@ -13,12 +17,13 @@ $fmtDate = static function (?string $value): string {
 ?>
 
 <link rel="stylesheet" href="<?= e(asset_url('/assets/css/customer-blacklist.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/order-detail-actions.css')) ?>">
 
 <section class="content-grid two">
-  <article class="panel">
+  <article class="panel order-detail-panel">
     <div class="section-head">
       <h2><?= e($order['order_code']) ?></h2>
-      <span class="pill <?= e($order['workflow_status']) ?>" data-order-status-pill><?= e($workflowLabels[$order['workflow_status']] ?? $order['workflow_status']) ?></span>
+      <span class="pill <?= e($currentWorkflow) ?>" data-order-status-pill><?= e($workflowLabels[$currentWorkflow] ?? $currentWorkflow) ?></span>
     </div>
     <dl class="detail-grid">
       <div><dt>Khách</dt><dd><?= e($order['customer_name']) ?></dd></div>
@@ -40,12 +45,47 @@ $fmtDate = static function (?string $value): string {
         <div class="wide"><dt>Địa chỉ</dt><dd><?= e($order['address'] ?: 'Chưa nhập') ?></dd></div>
       <?php endif; ?>
     </dl>
-    <form class="status-actions" method="post" action="<?= e(url('/orders/' . $order['id'] . '/status')) ?>">
-      <?= csrf_field() ?>
-      <?php foreach ($workflowLabels as $key => $label): ?>
-        <button class="btn <?= $order['workflow_status'] === $key ? 'primary' : 'ghost' ?>" name="workflow_status" value="<?= e($key) ?>" type="submit"><?= e($label) ?></button>
-      <?php endforeach; ?>
-    </form>
+
+    <div class="order-flow-block">
+      <div class="order-flow-head">
+        <div>
+          <h3>Chuyển trạng thái</h3>
+          <p>Click vào từng điểm để chuyển trạng thái đơn.</p>
+        </div>
+        <span class="order-flow-current <?= e($currentWorkflow) ?>"><?= e($workflowLabels[$currentWorkflow] ?? $currentWorkflow) ?></span>
+      </div>
+      <form
+        class="order-status-timeline"
+        method="post"
+        action="<?= e(url('/orders/' . $order['id'] . '/status')) ?>"
+        data-status-timeline
+        data-current-status="<?= e($currentWorkflow) ?>"
+        data-visual-status="<?= e($currentWorkflow) ?>"
+        style="--status-progress: <?= e((string) $statusProgress) ?>%; --status-step-count: <?= count($workflowKeys) ?>;"
+      >
+        <?= csrf_field() ?>
+        <div class="status-step-list">
+          <?php foreach ($workflowLabels as $key => $label): ?>
+            <?php
+              $stepIndex = array_search($key, $workflowKeys, true);
+              $stepIndex = $stepIndex === false ? 0 : (int) $stepIndex;
+              $isPassed = $stepIndex <= $currentWorkflowIndex;
+            ?>
+            <button
+              class="status-step <?= $currentWorkflow === $key ? 'is-current' : '' ?> <?= $isPassed ? 'is-passed' : '' ?>"
+              name="workflow_status"
+              value="<?= e($key) ?>"
+              type="submit"
+              data-status-step
+              data-step-index="<?= $stepIndex ?>"
+            >
+              <span class="status-dot" aria-hidden="true"></span>
+              <span class="status-label"><?= e($label) ?></span>
+            </button>
+          <?php endforeach; ?>
+        </div>
+      </form>
+    </div>
   </article>
 
   <article class="panel">
@@ -68,45 +108,11 @@ $fmtDate = static function (?string $value): string {
   </article>
 </section>
 
-<?php if (is_admin()): ?>
-<section class="panel admin-order-tools">
+<?php if ($blacklistEvents): ?>
+<section class="panel customer-flag-panel order-blacklist-history-panel <?= ((int) ($blacklist['active_count'] ?? 0) > 0) ? 'is-danger' : '' ?>">
   <div class="section-head">
     <div>
-      <h2>Quản trị đơn</h2>
-      <p class="muted small">Chỉ admin thấy phần này. Mọi thao tác được ghi vào audit log.</p>
-    </div>
-  </div>
-  <div class="admin-order-grid">
-    <form class="admin-order-form" method="post" action="<?= e(url('/orders/' . $order['id'] . '/reassign')) ?>">
-      <?= csrf_field() ?>
-      <label>Chuyển người tạo đơn
-        <select name="user_id" required>
-          <?php foreach ($adminUsers as $user): ?>
-            <option value="<?= (int) $user['id'] ?>" <?= (int) $order['user_id'] === (int) $user['id'] ? 'selected' : '' ?>>
-              <?= e($user['employee_code'] . ' - ' . $user['name']) ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <button class="btn primary" type="submit">Chuyển đơn</button>
-    </form>
-
-    <form class="admin-order-form admin-order-delete" method="post" action="<?= e(url('/orders/' . $order['id'] . '/delete')) ?>" onsubmit="return confirm('Xóa đơn <?= e($order['order_code']) ?>? Thao tác này không hoàn tác được.');">
-      <?= csrf_field() ?>
-      <div>
-        <strong>Xóa đơn</strong>
-        <p class="muted small">Dùng cho đơn test/sai. Sau khi xóa sẽ quay về danh sách đơn.</p>
-      </div>
-      <button class="btn danger" type="submit">Xóa đơn</button>
-    </form>
-  </div>
-</section>
-<?php endif; ?>
-
-<section class="panel customer-flag-panel <?= ((int) ($blacklist['active_count'] ?? 0) > 0) ? 'is-danger' : '' ?>">
-  <div class="section-head">
-    <div>
-      <h2><?= $isOrderBlacklisted ? 'Đơn này đã nằm trong blacklist' : 'Blacklist theo đơn hàng' ?></h2>
+      <h2>Lịch sử blacklist của SĐT này</h2>
       <p class="muted small">
         SĐT này đang có <strong><?= (int) ($blacklist['active_count'] ?? 0) ?></strong> đơn blacklist. Mỗi lần blacklist phải gắn với một đơn cụ thể.
       </p>
@@ -114,44 +120,26 @@ $fmtDate = static function (?string $value): string {
     <a class="btn ghost" href="<?= e(url('/customers/blacklist?q=' . rawurlencode((string) ($order['phone'] ?? '')))) ?>">Xem hồ sơ</a>
   </div>
 
-  <form class="customer-flag-form" method="post" action="<?= e(url('/orders/' . $order['id'] . '/blacklist')) ?>">
-    <?= csrf_field() ?>
-    <?php if ($isOrderBlacklisted): ?>
-      <input type="hidden" name="is_blacklisted" value="0">
-      <div class="blacklist-current-reason">
-        <span>Lý do đơn này</span>
-        <strong><?= e($orderBlacklistEntry['reason'] ?: 'Chưa ghi lý do') ?></strong>
-        <small>Thêm: <?= e($fmtDate($orderBlacklistEntry['added_at'] ?? null)) ?><?= !empty($orderBlacklistEntry['added_by_name']) ? ' · ' . e($orderBlacklistEntry['added_by_name']) : '' ?></small>
-      </div>
-      <button class="btn ghost" type="submit">Gỡ đơn này</button>
-    <?php else: ?>
-      <input type="hidden" name="is_blacklisted" value="1">
-      <input name="reason" placeholder="Lý do cho đơn này: boom hàng, hủy sát giờ, không nghe máy" required>
-      <button class="btn danger" type="submit">Thêm đơn này</button>
-    <?php endif; ?>
-  </form>
-
-  <?php if ($blacklistEvents): ?>
-    <details class="order-blacklist-history" <?= (int) ($blacklist['active_count'] ?? 0) > 0 ? 'open' : '' ?>>
-      <summary>Lịch sử blacklist của SĐT này</summary>
-      <div class="blacklist-event-list compact">
-        <?php foreach ($blacklistEvents as $event): ?>
-          <article class="blacklist-event-card <?= (int) ($event['order_id'] ?? 0) === (int) $order['id'] ? 'is-current' : '' ?>">
-            <div class="blacklist-event-top">
-              <div>
-                <a href="<?= e(url('/orders/' . (int) $event['order_id'])) ?>"><strong><?= e($event['order_code'] ?: ('Đơn #' . (int) $event['order_id'])) ?></strong></a>
-                <small><?= e($event['order_branch_name'] ?: 'Chưa CN') ?> · <?= e($event['order_source_name'] ?: 'Chưa nguồn') ?></small>
-              </div>
-              <b><?= money((int) ($event['order_total'] ?? 0)) ?></b>
+  <details class="order-blacklist-history" <?= (int) ($blacklist['active_count'] ?? 0) > 0 ? 'open' : '' ?>>
+    <summary>Danh sách sự kiện blacklist</summary>
+    <div class="blacklist-event-list compact">
+      <?php foreach ($blacklistEvents as $event): ?>
+        <article class="blacklist-event-card <?= (int) ($event['order_id'] ?? 0) === (int) $order['id'] ? 'is-current' : '' ?>">
+          <div class="blacklist-event-top">
+            <div>
+              <a href="<?= e(url('/orders/' . (int) $event['order_id'])) ?>"><strong><?= e($event['order_code'] ?: ('Đơn #' . (int) $event['order_id'])) ?></strong></a>
+              <small><?= e($event['order_branch_name'] ?: 'Chưa CN') ?> · <?= e($event['order_source_name'] ?: 'Chưa nguồn') ?></small>
             </div>
-            <div class="blacklist-event-reason"><span>Lý do</span><strong><?= e($event['reason'] ?: 'Chưa ghi lý do') ?></strong></div>
-            <div class="blacklist-event-meta"><span><?= e($fmtDate($event['added_at'] ?? null)) ?></span><span><?= e($event['added_by_name'] ?: 'Không rõ') ?></span></div>
-          </article>
-        <?php endforeach; ?>
-      </div>
-    </details>
-  <?php endif; ?>
+            <b><?= money((int) ($event['order_total'] ?? 0)) ?></b>
+          </div>
+          <div class="blacklist-event-reason"><span>Lý do</span><strong><?= e($event['reason'] ?: 'Chưa ghi lý do') ?></strong></div>
+          <div class="blacklist-event-meta"><span><?= e($fmtDate($event['added_at'] ?? null)) ?></span><span><?= e($event['added_by_name'] ?: 'Không rõ') ?></span></div>
+        </article>
+      <?php endforeach; ?>
+    </div>
+  </details>
 </section>
+<?php endif; ?>
 
 <section class="panel">
   <div class="section-head">
@@ -178,3 +166,5 @@ $fmtDate = static function (?string $value): string {
     </table>
   </div>
 </section>
+
+<script src="<?= e(asset_url('/assets/js/order-status-timeline.js')) ?>"></script>
