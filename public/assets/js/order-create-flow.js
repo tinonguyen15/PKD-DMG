@@ -18,33 +18,36 @@
     node.dataset.autosaveTone = tone || '';
   }
 
-  function dispatchNewOrderSubmit() {
-    const event = typeof SubmitEvent === 'function'
-      ? new SubmitEvent('submit', { bubbles: true, cancelable: true })
-      : new Event('submit', { bubbles: true, cancelable: true });
-    const handled = !newOrderForm.dispatchEvent(event);
-
-    if (!handled) {
-      if (typeof newOrderForm.requestSubmit === 'function') {
-        newOrderForm.requestSubmit();
-      } else {
-        newOrderForm.submit();
-      }
+  async function createBlankProcessingOrder() {
+    const response = await fetch(newOrderForm.action, {
+      method: 'POST',
+      body: new FormData(newOrderForm),
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.order?.id) {
+      throw new Error(payload.message || 'Không tạo được đơn trống.');
     }
+    return payload.order;
   }
 
-  function ensureBlankProcessingOrder() {
+  async function ensureBlankProcessingOrder() {
     if (currentOrderId() > 0) return;
     if (processingCardCount() > 0) return;
     if (newOrderForm.dataset.autoCreating === '1') return;
 
     newOrderForm.dataset.autoCreating = '1';
     setStatus('Đang tạo sẵn đơn trống để nhập thông tin...', 'saving');
-    window.setTimeout(dispatchNewOrderSubmit, 80);
+
+    try {
+      const order = await createBlankProcessingOrder();
+      window.location.replace(`/orders/create?edit_order_id=${encodeURIComponent(order.id)}`);
+    } catch (error) {
+      newOrderForm.dataset.autoCreating = '';
+      setStatus(error.message || 'Không tạo được đơn trống.', 'error');
+    }
   }
 
   window.setTimeout(ensureBlankProcessingOrder, 220);
-  document.addEventListener('order-workspace:loaded', () => {
-    newOrderForm.dataset.autoCreating = '';
-  });
 })();
