@@ -1,8 +1,13 @@
 (function () {
+  function cleanUrl(value) {
+    return String(value || '').trim().replace(/^\\?"/, '').replace(/\\?"$/, '');
+  }
+
   document.addEventListener('click', (event) => {
     const card = event.target.closest('[data-open-order-url]');
     if (card && !event.target.closest('a, button, form, input, textarea, select')) {
-      window.location.href = card.dataset.openOrderUrl;
+      const url = cleanUrl(card.dataset.openOrderUrl);
+      if (url) window.location.href = url;
       return;
     }
   }, true);
