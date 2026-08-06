@@ -10,7 +10,7 @@
   const statusNode = form.querySelector('[data-draft-sync-status]');
   let autosaveTimer = null;
   let autosaveStatus = 'Đang sửa đơn cũ. Thay đổi sẽ tự lưu.';
-  let lastSignature = '';
+  let lastSavedSignature = '';
   let isSaving = false;
   let isSubmitting = false;
   let queuedWhileSaving = false;
@@ -72,8 +72,7 @@
     if (!autosaveUrl || isSubmitting) return false;
 
     const signature = formSignature();
-    if (signature === lastSignature && !quiet) return true;
-    lastSignature = signature;
+    if (signature === lastSavedSignature && !quiet) return true;
 
     if (isSaving) {
       queuedWhileSaving = true;
@@ -99,6 +98,7 @@
         throw new Error(payload.message || 'Không tự lưu được đơn.');
       }
 
+      lastSavedSignature = signature;
       const totalNode = form.querySelector('[data-order-total]');
       const preview = form.querySelector('[data-order-preview]');
       if (totalNode && typeof payload.total !== 'undefined') totalNode.textContent = money(payload.total);
@@ -180,7 +180,7 @@
   window.addEventListener('beforeunload', sendBeaconAutosave);
 
   removeManualSaveButton();
-  lastSignature = formSignature();
+  lastSavedSignature = formSignature();
   refreshHeader();
   setStatus('Đang sửa đơn cũ. Thay đổi sẽ tự lưu.', 'idle');
   window.setTimeout(refreshHeader, 0);
