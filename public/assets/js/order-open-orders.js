@@ -8,8 +8,12 @@
     if (document.querySelector('[data-order-workspace-smooth-css]')) return;
     const style = document.createElement('style');
     style.dataset.orderWorkspaceSmoothCss = '1';
-    style.textContent = '.order-workspace-form.is-workspace-loading{opacity:1!important;filter:none!important}.order-workspace-form.is-workspace-loading::after{content:none!important;display:none!important}.order-workspace-form [data-menu-panel],.order-workspace-form .cart-panel{transition:none!important}';
+    style.textContent = '.order-workspace-form.is-workspace-loading{opacity:1!important;filter:none!important}.order-workspace-form.is-workspace-loading::after{content:none!important;display:none!important}.order-workspace-form [data-menu-panel],.order-workspace-form .cart-panel{transition:none!important}.open-order-card [data-copy-target]{display:none!important}';
     document.head.appendChild(style);
+  }
+
+  function removeCardCopyButtons() {
+    $$('.open-order-card [data-copy-target]').forEach((button) => button.remove());
   }
 
   function toast(message) {
@@ -99,6 +103,7 @@
     history.replaceState({}, '', `/orders/create?edit_order_id=${order.id || ''}`);
     form.dispatchEvent(new Event('change', { bubbles: true }));
     form.dispatchEvent(new CustomEvent('order-workspace:loaded', { bubbles: true, detail: data }));
+    removeCardCopyButtons();
   }
 
   function addOrUpdateCard(data) {
@@ -106,10 +111,9 @@
     let card = document.querySelector(`[data-open-order-card][data-order-id="${CSS.escape(String(order.id || ''))}"]`);
     if (!card) {
       $('[data-open-order-empty]')?.remove();
-      const copyId = `active-order-copy-${order.id}`;
       const completeId = `active-order-complete-${order.id}`;
       const reopenId = `active-order-reopen-${order.id}`;
-      $('[data-open-order-list]')?.insertAdjacentHTML('afterbegin', `<article class="open-order-card is-processing" data-open-order-card data-order-id="${order.id}" data-edit-data-url="/orders/${order.id}/edit-data" data-open-order-url="/orders/create?edit_order_id=${order.id}"><div class="open-order-main"><a href="/orders/${order.id}">${order.order_code}</a><span data-open-order-status>Đang xử lý</span></div><div class="open-order-meta" data-open-order-meta>Chưa nhập tên<br>${order.branch_name || 'Chưa CN'} | ${order.source_name || 'Chưa nguồn'}</div><div class="open-order-bottom"><b data-open-order-total>${money(order.total)}</b><div class="open-order-actions"><button class="btn ghost open-order-edit-btn is-hidden" type="submit" form="${reopenId}" title="Sửa lại đơn đã gửi CN">✎</button><button class="btn ghost" type="button" data-copy-target="#${copyId}" data-copy-sent-url="/orders/${order.id}/copy-sent" data-copy-auto-sent="1">Copy gửi CN</button><button class="btn complete" type="submit" form="${completeId}">Hoàn thành</button></div></div><small class="open-order-hint" data-open-order-hint>Click card để làm tiếp</small><textarea id="${copyId}" class="active-order-copy" readonly data-open-order-copy></textarea></article>`);
+      $('[data-open-order-list]')?.insertAdjacentHTML('afterbegin', `<article class="open-order-card is-processing" data-open-order-card data-order-id="${order.id}" data-edit-data-url="/orders/${order.id}/edit-data" data-open-order-url="/orders/create?edit_order_id=${order.id}"><div class="open-order-main"><a href="/orders/${order.id}">${order.order_code}</a><span data-open-order-status>Đang xử lý</span></div><div class="open-order-meta" data-open-order-meta>Chưa nhập tên<br>${order.branch_name || 'Chưa CN'} | ${order.source_name || 'Chưa nguồn'}</div><div class="open-order-bottom"><b data-open-order-total>${money(order.total)}</b><div class="open-order-actions"><button class="btn ghost open-order-edit-btn is-hidden" type="submit" form="${reopenId}" title="Sửa lại đơn đã gửi CN">✎</button><button class="btn complete" type="submit" form="${completeId}">Hoàn thành</button></div></div><small class="open-order-hint" data-open-order-hint>Click card để làm tiếp</small></article>`);
       $('[data-open-order-forms]')?.insertAdjacentHTML('beforeend', `<form id="${completeId}" class="active-order-complete-form" method="post" action="/orders/${order.id}/status"><input type="hidden" name="_csrf" value="${csrf()}"><input type="hidden" name="workflow_status" value="completed"></form><form id="${reopenId}" class="active-order-reopen-form" method="post" action="/orders/${order.id}/reopen-edit-json"><input type="hidden" name="_csrf" value="${csrf()}"></form>`);
       card = document.querySelector(`[data-open-order-card][data-order-id="${CSS.escape(String(order.id))}"]`);
     }
@@ -117,8 +121,7 @@
       card.classList.remove('is-sent');
       card.classList.add('is-processing');
       $('.open-order-edit-btn', card)?.classList.add('is-hidden');
-      const copy = $('[data-open-order-copy]', card);
-      if (copy) copy.value = order.generated_text || '';
+      removeCardCopyButtons();
     }
   }
 
@@ -163,4 +166,5 @@
   }, true);
 
   injectSmoothWorkspaceCss();
+  removeCardCopyButtons();
 })();
