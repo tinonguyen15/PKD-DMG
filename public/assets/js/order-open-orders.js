@@ -25,6 +25,13 @@
     return payload;
   }
 
+  function setStatus(text, tone) {
+    const node = $('[data-draft-sync-status]');
+    if (!node) return;
+    node.textContent = text;
+    node.dataset.autosaveTone = tone || '';
+  }
+
   function setRadio(form, name, value) {
     const input = form.querySelector(`[name="${name}"][value="${CSS.escape(String(value || ''))}"]`);
     if (input) input.checked = true;
@@ -36,7 +43,6 @@
     const order = data.order || {};
     const payload = data.payload || {};
 
-    form.dataset.workspaceLoading = '1';
     form.dataset.orderEditing = '1';
     form.dataset.currentOrderId = String(order.id || 0);
     form.dataset.editOrderCode = order.order_code || '';
@@ -73,7 +79,7 @@
 
     $('[data-active-draft-code]') && ($('[data-active-draft-code]').textContent = order.order_code || 'Đang làm');
     $('[data-active-draft-info]') && ($('[data-active-draft-info]').textContent = 'Đơn đang xử lý. Thay đổi sẽ tự lưu.');
-    $('[data-draft-sync-status]') && ($('[data-draft-sync-status]').textContent = 'Đã mở đơn trong trang, không reload.');
+    setStatus('Đã mở đơn, không tải lại trang.', 'idle');
 
     $$('[data-open-order-card]').forEach((card) => {
       const active = String(card.dataset.orderId || '') === String(order.id || '');
@@ -85,7 +91,6 @@
     history.replaceState({}, '', `/orders/create?edit_order_id=${order.id || ''}`);
     form.dispatchEvent(new Event('change', { bubbles: true }));
     form.dispatchEvent(new CustomEvent('order-workspace:loaded', { bubbles: true, detail: data }));
-    setTimeout(() => { form.dataset.workspaceLoading = ''; }, 80);
   }
 
   function addOrUpdateCard(data) {
@@ -114,10 +119,11 @@
     if (!card || event.target.closest('a, button, input, textarea, select, form')) return;
     event.preventDefault();
     try {
-      $('[data-order-create]')?.classList.add('is-workspace-loading');
+      setStatus('Đang mở đơn...', 'saving');
       fillForm(await json(card.dataset.editDataUrl));
     } catch (error) {
       toast(error.message);
+      setStatus('Không mở được đơn.', 'error');
     }
   }, true);
 
@@ -126,11 +132,12 @@
     if (newForm) {
       event.preventDefault();
       try {
+        setStatus('Đang tạo đơn...', 'saving');
         const data = await json(newForm.action, { method: 'POST', body: new FormData(newForm) });
         addOrUpdateCard(data);
         fillForm(data);
         toast('Đã tạo đơn đang xử lý');
-      } catch (error) { toast(error.message); }
+      } catch (error) { toast(error.message); setStatus('Không tạo được đơn.', 'error'); }
       return;
     }
 
@@ -139,10 +146,11 @@
     event.preventDefault();
     if (!window.confirm('Đơn này đã gửi CN. Sửa lại sẽ chuyển về Đang xử lý và cần Copy gửi CN lại. Tiếp tục?')) return;
     try {
+      setStatus('Đang chuyển về Đang xử lý...', 'saving');
       const data = await json(reopenForm.action, { method: 'POST', body: new FormData(reopenForm) });
       addOrUpdateCard(data);
       fillForm(data);
       toast('Đã chuyển về Đang xử lý để sửa lại');
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message); setStatus('Không sửa lại được đơn.', 'error'); }
   }, true);
 })();
