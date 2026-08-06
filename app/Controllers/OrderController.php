@@ -7,6 +7,7 @@ use App\Models\CatalogModel;
 use App\Models\ContactModel;
 use App\Models\CustomerBlacklistModel;
 use App\Models\CustomerModel;
+use App\Models\OpenOrderModel;
 use App\Models\OrderDraftModel;
 use App\Models\OrderEditModel;
 use App\Models\OrderModel;
@@ -39,10 +40,7 @@ class OrderController extends Controller
             $editingOrder = OrderModel::find($editOrderId);
         }
 
-        $activeOrders = array_values(array_filter(
-            OrderModel::all(),
-            static fn(array $order): bool => in_array((string) ($order['workflow_status'] ?? ''), ['processing', 'sent'], true)
-        ));
+        $activeOrders = OpenOrderModel::activeOpenOrders();
 
         $this->view('orders/create', [
             'title' => 'Tạo đơn',

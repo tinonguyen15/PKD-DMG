@@ -11,6 +11,10 @@
   let isSubmitting = false;
   let queuedWhileSaving = false;
 
+  function isApplying() {
+    return form.dataset.workspaceApplying === '1';
+  }
+
   function orderId() {
     return parseInt(editInput?.value || form.dataset.currentOrderId || '0', 10) || 0;
   }
@@ -69,7 +73,7 @@
 
   async function autosaveNow({ quiet = false } = {}) {
     const url = autosaveUrl();
-    if (!url || isSubmitting || form.dataset.workspaceLoading === '1') return false;
+    if (!url || isSubmitting || isApplying()) return false;
 
     const signature = formSignature();
     if (signature === lastSavedSignature && !quiet) return true;
@@ -111,7 +115,7 @@
       return false;
     } finally {
       isSaving = false;
-      if (queuedWhileSaving && !isSubmitting) {
+      if (queuedWhileSaving && !isSubmitting && !isApplying()) {
         queuedWhileSaving = false;
         window.setTimeout(() => autosaveNow(), 120);
       }
@@ -119,7 +123,7 @@
   }
 
   function queueAutosave() {
-    if (!autosaveUrl() || isSubmitting || form.dataset.workspaceLoading === '1') return;
+    if (!autosaveUrl() || isSubmitting || isApplying()) return;
     refreshHeader();
     if (autosaveTimer) clearTimeout(autosaveTimer);
     setStatus('Đang chờ tự lưu...', 'pending');
@@ -137,7 +141,7 @@
     if (!link || link.closest('[data-open-order-card]')) return;
     const href = link.getAttribute('href') || '';
     if (!href || href.startsWith('#') || link.target === '_blank' || link.dataset.noEditAutosave === '1') return;
-    if (!autosaveUrl()) return;
+    if (!autosaveUrl() || isApplying()) return;
 
     if (autosaveTimer) clearTimeout(autosaveTimer);
     event.preventDefault();
@@ -147,7 +151,7 @@
 
   function sendBeaconAutosave() {
     const url = autosaveUrl();
-    if (!url || isSubmitting) return;
+    if (!url || isSubmitting || isApplying()) return;
     try {
       const data = new FormData(form);
       data.set('edit_order_id', String(orderId()));
@@ -157,14 +161,17 @@
   }
 
   form.addEventListener('input', (event) => {
+    if (isApplying()) return;
     if (shouldAutosaveEventTarget(event.target)) queueAutosave();
   }, true);
 
   form.addEventListener('change', (event) => {
+    if (isApplying()) return;
     if (shouldAutosaveEventTarget(event.target)) queueAutosave();
   }, true);
 
   form.addEventListener('click', (event) => {
+    if (isApplying()) return;
     window.requestAnimationFrame(refreshHeader);
     if (shouldAutosaveEventTarget(event.target)) window.setTimeout(queueAutosave, 80);
   }, true);
@@ -176,10 +183,13 @@
 
   form.addEventListener('order-workspace:loaded', () => {
     isSubmitting = false;
+    queuedWhileSaving = false;
     if (autosaveTimer) clearTimeout(autosaveTimer);
-    lastSavedSignature = formSignature();
-    setStatus('Đã mở đơn. Sửa gì hệ thống sẽ tự lưu.', 'idle');
-    refreshHeader();
+    window.requestAnimationFrame(() => {
+      lastSavedSignature = formSignature();
+      setStatus('Đã mở đơn. Sửa gì hệ thống sẽ tự lưu.', 'idle');
+      refreshHeader();
+    });
   });
 
   document.addEventListener('click', saveBeforeNavigation, true);
