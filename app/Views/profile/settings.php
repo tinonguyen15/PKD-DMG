@@ -1,5 +1,6 @@
 <link rel="stylesheet" href="<?= e(asset_url('/assets/css/profile-personal-menu.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset_url('/assets/css/info-pages.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/settings-system.css')) ?>">
 
 <section class="panel">
   <div class="section-head">
