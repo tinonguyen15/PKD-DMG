@@ -16,6 +16,16 @@ class PreferenceModel
         'copy_branch_tag_text' => '',
         'copy_branch_tag_require_branch_match' => false,
         'copy_branch_tag_by_branch' => [],
+        'copy_branch_show_item_price' => false,
+        'copy_branch_show_total' => true,
+        'copy_customer_show_item_price' => true,
+        'copy_customer_show_total' => true,
+        'copy_template_delivery_branch' => "ĐƠN MANG VỀ\n\n• Tên: {customer_name}\n• SĐT: {phone}\n• Địa chỉ: {address}\n• Món:\n{items}\n{total_line}\n• Thời gian giao: {delivery_time}\n{branch_footer}",
+        'copy_template_delivery_customer' => "XÁC NHẬN ĐƠN MANG VỀ\n\n• Chi nhánh: {branch}\n• Tên: {customer_name}\n• SĐT: {phone}\n• Địa chỉ: {address}\n• Món:\n{items}\n{total_line}\n• Thời gian nhận: {receive_time}\n• Hình thức thanh toán: {payment}",
+        'copy_template_pickup_branch' => "ĐƠN GHÉ LẤY\n\n• Tên: {customer_name}\n• SĐT: {phone}\n• Chi nhánh: {branch}\n• Món:\n{items}\n{total_line}\n• Thời gian ghé lấy: {pickup_time}\n{branch_footer}",
+        'copy_template_pickup_customer' => "XÁC NHẬN ĐƠN GHÉ LẤY\n\n• Chi nhánh: {branch}\n• Tên: {customer_name}\n• SĐT: {phone}\n• Món:\n{items}\n{total_line}\n• Thời gian ghé lấy: {pickup_time}\n• Hình thức thanh toán: {payment}",
+        'copy_template_booking_branch' => "ĐƠN ĐẶT BÀN\n\n• Tên: {customer_name}\n• SĐT: {phone}\n• Chi nhánh: {branch}\n• Số lượng: {guest_count} khách\n• Thời gian: {receive_time}\n• Ghi chú: {note}\n{branch_footer}",
+        'copy_template_booking_customer' => "XÁC NHẬN ĐƠN ĐẶT BÀN\n\n• Chi nhánh: {branch}\n• Tên: {customer_name}\n• SĐT: {phone}\n• Số lượng: {guest_count} khách\n• Thời gian: {receive_time}\n• Ghi chú: {note}",
         'copy_branch_notice_bank_transfer' => '⚠ Lưu ý: Lên đơn và gửi Bill giúp em nhé.',
         'copy_branch_notice_default' => '⚠ Lưu ý: Lên đơn và gửi Bill giúp em nhé.',
         'copy_branch_notice_cod' => '⚠ Lưu ý: Đơn ship COD nhé',
@@ -33,6 +43,7 @@ class PreferenceModel
         'default_delivery_payment_method_id' => 0,
         'default_pickup_payment_method_id' => 0,
         'remember_last_order_choices' => false,
+        'show_recent_menu_items_first' => false,
         'favorite_menu_item_ids' => [],
         'default_contact_branch_id' => 0,
         'default_contact_channel' => 'hotline_1900',
@@ -53,8 +64,13 @@ class PreferenceModel
         'copy_branch_notice_scheduled_enabled',
         'copy_branch_include_tag',
         'copy_branch_tag_require_branch_match',
+        'copy_branch_show_item_price',
+        'copy_branch_show_total',
+        'copy_customer_show_item_price',
+        'copy_customer_show_total',
         'auto_mark_sent_on_branch_copy',
         'remember_last_order_choices',
+        'show_recent_menu_items_first',
     ];
 
     private const INT_KEYS = [
@@ -67,6 +83,12 @@ class PreferenceModel
 
     private const TEXT_KEYS = [
         'copy_branch_tag_text',
+        'copy_template_delivery_branch',
+        'copy_template_delivery_customer',
+        'copy_template_pickup_branch',
+        'copy_template_pickup_customer',
+        'copy_template_booking_branch',
+        'copy_template_booking_customer',
         'copy_branch_notice_bank_transfer',
         'copy_branch_notice_default',
         'copy_branch_notice_cod',
@@ -315,7 +337,8 @@ class PreferenceModel
             $clean[$key] = max(0, (int) ($values[$key] ?? 0));
         }
         foreach (self::TEXT_KEYS as $key) {
-            $clean[$key] = mb_substr(trim((string) ($values[$key] ?? self::DEFAULTS[$key])), 0, 500, 'UTF-8');
+            $limit = str_starts_with($key, 'copy_template_') ? 4000 : 500;
+            $clean[$key] = mb_substr(trim((string) ($values[$key] ?? self::DEFAULTS[$key])), 0, $limit, 'UTF-8');
         }
         $clean['copy_branch_tag_by_branch'] = self::sanitizeBranchTags((array) ($values['copy_branch_tag_by_branch'] ?? []));
         $clean['favorite_menu_item_ids'] = self::sanitizeIntList((array) ($values['favorite_menu_item_ids'] ?? []));
