@@ -43,9 +43,62 @@ $quickNotices = [
     'copy_branch_quick_notice_urgent' => 'Khách lấy gấp',
     'copy_branch_quick_notice_invoice' => 'Cần hóa đơn',
 ];
+$copyTemplates = [
+    'delivery' => [
+        'label' => '1. Đơn mang về',
+        'branch' => ['key' => 'copy_template_delivery_branch', 'label' => 'Gửi CN'],
+        'customer' => ['key' => 'copy_template_delivery_customer', 'label' => 'Gửi KH'],
+    ],
+    'pickup' => [
+        'label' => '2. Đơn ghé lấy',
+        'branch' => ['key' => 'copy_template_pickup_branch', 'label' => 'Gửi CN'],
+        'customer' => ['key' => 'copy_template_pickup_customer', 'label' => 'Gửi KH'],
+    ],
+    'booking' => [
+        'label' => '3. Đơn đặt bàn',
+        'branch' => ['key' => 'copy_template_booking_branch', 'label' => 'Gửi CN'],
+        'customer' => ['key' => 'copy_template_booking_customer', 'label' => 'Gửi KH'],
+    ],
+];
+$renderTemplateTextarea = function (string $key, string $label) use ($preferenceValues, $disabled, $lockControl, $lockedNote): void {
+    ?>
+    <label class="wide"><?= e($label) ?>
+      <textarea name="<?= e($key) ?>" rows="8" spellcheck="false"<?= $disabled($key) ?>><?= e($preferenceValues[$key] ?? '') ?></textarea>
+    </label>
+    <?php $lockControl($key); $lockedNote($key); ?>
+    <?php
+};
 ?>
 
 <div class="preference-grid compact">
+  <details class="preference-group" open>
+    <summary><span>Mẫu copy đơn hàng</span><small>Admin xem/sửa đúng các mẫu đang dùng khi bấm Copy gửi CN / Copy gửi KH</small></summary>
+    <div class="preference-group-body">
+      <p class="preference-hint wide">
+        Các biến có thể dùng: <code>{customer_name}</code>, <code>{phone}</code>, <code>{address}</code>, <code>{branch}</code>, <code>{items}</code>, <code>{total_line}</code>, <code>{delivery_time}</code>, <code>{pickup_time}</code>, <code>{receive_time}</code>, <code>{payment}</code>, <code>{branch_footer}</code>, <code>{guest_count}</code>, <code>{note}</code>.
+      </p>
+      <div class="setting-row wide">
+        <label class="check"><input type="checkbox" name="copy_branch_show_item_price" value="1" <?= $checked('copy_branch_show_item_price') ?><?= $disabled('copy_branch_show_item_price') ?>> Gửi CN: hiện giá sau từng món</label>
+        <?php $lockControl('copy_branch_show_item_price'); $lockedNote('copy_branch_show_item_price'); ?>
+        <label class="check"><input type="checkbox" name="copy_branch_show_total" value="1" <?= $checked('copy_branch_show_total') ?><?= $disabled('copy_branch_show_total') ?>> Gửi CN: hiện dòng tổng tiền</label>
+        <?php $lockControl('copy_branch_show_total'); $lockedNote('copy_branch_show_total'); ?>
+        <label class="check"><input type="checkbox" name="copy_customer_show_item_price" value="1" <?= $checked('copy_customer_show_item_price') ?><?= $disabled('copy_customer_show_item_price') ?>> Gửi KH: hiện giá sau từng món</label>
+        <?php $lockControl('copy_customer_show_item_price'); $lockedNote('copy_customer_show_item_price'); ?>
+        <label class="check"><input type="checkbox" name="copy_customer_show_total" value="1" <?= $checked('copy_customer_show_total') ?><?= $disabled('copy_customer_show_total') ?>> Gửi KH: hiện dòng tổng bill</label>
+        <?php $lockControl('copy_customer_show_total'); $lockedNote('copy_customer_show_total'); ?>
+      </div>
+      <?php foreach ($copyTemplates as $group): ?>
+        <details class="preference-template wide" open>
+          <summary><?= e($group['label']) ?></summary>
+          <div class="quick-template-grid">
+            <?php $renderTemplateTextarea($group['branch']['key'], $group['branch']['label']); ?>
+            <?php $renderTemplateTextarea($group['customer']['key'], $group['customer']['label']); ?>
+          </div>
+        </details>
+      <?php endforeach; ?>
+    </div>
+  </details>
+
   <details class="preference-group" open>
     <summary><span>Copy gửi CN</span><small>Lưu ý theo điều kiện, lưu ý nhanh và tag Zalo</small></summary>
     <div class="preference-group-body">
