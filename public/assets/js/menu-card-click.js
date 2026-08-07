@@ -47,6 +47,15 @@
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   let previewQueued = false;
 
+  const DEFAULT_TEMPLATES = {
+    copy_template_delivery_branch: 'ĐƠN MANG VỀ\n\n• Tên: {customer_name}\n• SĐT: {phone}\n• Địa chỉ: {address}\n• Món:\n{items}\n{total_line}\n• Thời gian giao: {delivery_time}\n{branch_footer}',
+    copy_template_delivery_customer: 'XÁC NHẬN ĐƠN MANG VỀ\n\n• Chi nhánh: {branch}\n• Tên: {customer_name}\n• SĐT: {phone}\n• Địa chỉ: {address}\n• Món:\n{items}\n{total_line}\n• Thời gian nhận: {receive_time}\n• Hình thức thanh toán: {payment}',
+    copy_template_pickup_branch: 'ĐƠN GHÉ LẤY\n\n• Tên: {customer_name}\n• SĐT: {phone}\n• Chi nhánh: {branch}\n• Món:\n{items}\n{total_line}\n• Thời gian ghé lấy: {pickup_time}\n{branch_footer}',
+    copy_template_pickup_customer: 'XÁC NHẬN ĐƠN GHÉ LẤY\n\n• Chi nhánh: {branch}\n• Tên: {customer_name}\n• SĐT: {phone}\n• Món:\n{items}\n{total_line}\n• Thời gian ghé lấy: {pickup_time}\n• Hình thức thanh toán: {payment}',
+    copy_template_booking_branch: 'ĐƠN ĐẶT BÀN\n\n• Tên: {customer_name}\n• SĐT: {phone}\n• Chi nhánh: {branch}\n• Số lượng: {guest_count} khách\n• Thời gian: {receive_time}\n• Ghi chú: {note}\n{branch_footer}',
+    copy_template_booking_customer: 'XÁC NHẬN ĐƠN ĐẶT BÀN\n\n• Chi nhánh: {branch}\n• Tên: {customer_name}\n• SĐT: {phone}\n• Số lượng: {guest_count} khách\n• Thời gian: {receive_time}\n• Ghi chú: {note}'
+  };
+
   function money(value) {
     return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
   }
@@ -68,7 +77,9 @@
   }
 
   function textPref(key, fallback = '') {
-    return String(Object.prototype.hasOwnProperty.call(prefs, key) ? prefs[key] : fallback || '').trim();
+    const value = Object.prototype.hasOwnProperty.call(prefs, key) ? prefs[key] : fallback;
+    const text = String(value ?? '').trim();
+    return text !== '' ? text : String(fallback ?? '').trim();
   }
 
   function selectedValue(name) {
@@ -176,127 +187,71 @@
 
   function itemLines(target) {
     const items = selectedItems(target);
-    if (!items.length) return ['  Chưa chọn món'];
-    return items.map((item) => `  ${item.text}`);
+    if (!items.length) return '  Chưa chọn món';
+    return items.map((item) => `  ${item.text}`).join('\n');
   }
 
-  function trimBlankTail(lines) {
-    const next = [...lines];
-    while (next.length && String(next[next.length - 1]).trim() === '') next.pop();
-    return next.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  function totalLine(target, items) {
+    const isCustomer = target === 'customer';
+    const visible = isCustomer ? boolPref('copy_customer_show_total', true) : boolPref('copy_branch_show_total', true);
+    if (!visible) return '';
+    return `${isCustomer ? '=> Tổng' : '=> Tổng tiền'}: ${money(total(items))}`;
+  }
+
+  function templateKey(type, target) {
+    const safeType = ['delivery', 'pickup', 'booking'].includes(type) ? type : 'delivery';
+    return `copy_template_${safeType}_${target === 'customer' ? 'customer' : 'branch'}`;
+  }
+
+  function cleanRenderedText(text) {
+    return String(text || '')
+      .replace(/\r\n/g, '\n')
+      .split('\n')
+      .map((line) => line.replace(/[ \t]+$/g, ''))
+      .filter((line) => !/^\s*•\s*Ghi chú:\s*$/i.test(line))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function renderTemplate(template, tokens) {
+    return cleanRenderedText(String(template || '').replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key) => {
+      return Object.prototype.hasOwnProperty.call(tokens, key) ? String(tokens[key] ?? '') : match;
+    }));
+  }
+
+  function buildCopyText(target = 'branch') {
+    const type = selectedValue('order_type') || 'delivery';
+    const items = selectedItems(target);
+    const receiveTime = field('receive_time');
+    const key = templateKey(type, target);
+    const template = textPref(key, DEFAULT_TEMPLATES[key]);
+    const tokens = {
+      customer_name: field('customer_name'),
+      phone: field('phone'),
+      address: field('address'),
+      branch: selectedText('branch_id', 'Chưa chọn'),
+      payment: selectedText('payment_method_id', 'Chưa chọn'),
+      items: itemLines(target),
+      total_line: totalLine(target, items),
+      total: money(total(items)),
+      total_money: money(total(items)),
+      delivery_time: receiveTime || 'Giao ngay',
+      pickup_time: receiveTime || 'Chưa nhập',
+      receive_time: receiveTime || (type === 'delivery' ? 'Giao ngay' : 'Chưa nhập'),
+      branch_footer: branchNoticeLines().join('\n'),
+      guest_count: field('guest_count') || '0',
+      note: field('note')
+    };
+    return renderTemplate(template, tokens);
   }
 
   function buildBranchCopyText() {
-    const type = selectedValue('order_type') || 'delivery';
-    const items = selectedItems('branch');
-    const showTotal = boolPref('copy_branch_show_total', true);
-    const name = field('customer_name');
-    const phone = field('phone');
-    const address = field('address');
-    const branch = selectedText('branch_id', 'Chưa chọn');
-    const receiveTime = field('receive_time');
-
-    if (type === 'booking') {
-      const lines = [
-        'ĐƠN ĐẶT BÀN',
-        '',
-        `• Tên: ${name}`,
-        phone ? `• SĐT: ${phone}` : '',
-        `• Chi nhánh: ${branch}`,
-        `• Số lượng: ${field('guest_count') || '0'} khách`,
-        `• Thời gian: ${receiveTime || 'Chưa nhập'}`,
-        field('note') ? `• Ghi chú: ${field('note')}` : '',
-        ...branchNoticeLines()
-      ];
-      return trimBlankTail(lines.filter((line) => line !== ''));
-    }
-
-    if (type === 'pickup') {
-      const lines = [
-        'ĐƠN GHÉ LẤY',
-        '',
-        `• Tên: ${name}`,
-        phone ? `• SĐT: ${phone}` : '',
-        `• Chi nhánh: ${branch}`,
-        '• Món:',
-        ...itemLines('branch'),
-        showTotal ? `=> Tổng tiền: ${money(total(items))}` : '',
-        `• Thời gian ghé lấy: ${receiveTime || 'Chưa nhập'}`,
-        ...branchNoticeLines()
-      ];
-      return trimBlankTail(lines.filter((line) => line !== ''));
-    }
-
-    const lines = [
-      'ĐƠN MANG VỀ',
-      '',
-      `• Tên: ${name}`,
-      `• SĐT: ${phone}`,
-      `• Địa chỉ: ${address}`,
-      '• Món:',
-      ...itemLines('branch'),
-      showTotal ? `=> Tổng tiền: ${money(total(items))}` : '',
-      `• Thời gian giao: ${receiveTime || 'Giao ngay'}`,
-      ...branchNoticeLines()
-    ];
-    return trimBlankTail(lines.filter((line) => line !== ''));
+    return buildCopyText('branch');
   }
 
   function buildCustomerCopyText() {
-    const type = selectedValue('order_type') || 'delivery';
-    const items = selectedItems('customer');
-    const showTotal = boolPref('copy_customer_show_total', true);
-    const name = field('customer_name');
-    const phone = field('phone');
-    const address = field('address');
-    const branch = selectedText('branch_id', 'Chưa chọn');
-    const receiveTime = field('receive_time');
-    const payment = selectedText('payment_method_id', 'Chưa chọn');
-
-    if (type === 'booking') {
-      const lines = [
-        'XÁC NHẬN ĐƠN ĐẶT BÀN',
-        '',
-        `• Chi nhánh: ${branch}`,
-        `• Tên: ${name}`,
-        phone ? `• SĐT: ${phone}` : '',
-        `• Số lượng: ${field('guest_count') || '0'} khách`,
-        `• Thời gian: ${receiveTime || 'Chưa nhập'}`,
-        field('note') ? `• Ghi chú: ${field('note')}` : ''
-      ];
-      return trimBlankTail(lines.filter((line) => line !== ''));
-    }
-
-    if (type === 'pickup') {
-      const lines = [
-        'XÁC NHẬN ĐƠN GHÉ LẤY',
-        '',
-        `• Chi nhánh: ${branch}`,
-        `• Tên: ${name}`,
-        phone ? `• SĐT: ${phone}` : '',
-        '• Món:',
-        ...itemLines('customer'),
-        showTotal ? `=> Tổng: ${money(total(items))}` : '',
-        `• Thời gian ghé lấy: ${receiveTime || 'Chưa nhập'}`,
-        `• Hình thức thanh toán: ${payment}`
-      ];
-      return trimBlankTail(lines.filter((line) => line !== ''));
-    }
-
-    const lines = [
-      'XÁC NHẬN ĐƠN MANG VỀ',
-      '',
-      `• Chi nhánh: ${branch}`,
-      `• Tên: ${name}`,
-      `• SĐT: ${phone}`,
-      `• Địa chỉ: ${address}`,
-      '• Món:',
-      ...itemLines('customer'),
-      showTotal ? `=> Tổng: ${money(total(items))}` : '',
-      `• Thời gian nhận: ${receiveTime || 'Giao ngay'}`,
-      `• Hình thức thanh toán: ${payment}`
-    ];
-    return trimBlankTail(lines.filter((line) => line !== ''));
+    return buildCopyText('customer');
   }
 
   function updatePreview() {
